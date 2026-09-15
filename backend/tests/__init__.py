@@ -1,1 +1,1 @@
-"""Test suite for the stock market predictor backend."""
+"""Test suite for the marketlens backend."""

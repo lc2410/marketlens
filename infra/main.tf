@@ -120,8 +120,8 @@ resource "oci_core_instance" "app_server" {
 
       # Clone and Setup App
       cd /home/ubuntu
-      git clone https://github.com/lc2410/stock-market-predictor.git
-      cd stock-market-predictor
+      git clone https://github.com/lc2410/marketlens.git
+      cd marketlens
       python3 -m venv venv
       source venv/bin/activate
       pip install -r requirements.txt
@@ -135,9 +135,9 @@ resource "oci_core_instance" "app_server" {
       [Service]
       User=root
       Group=www-data
-      WorkingDirectory=/home/ubuntu/stock-market-predictor/backend
-      Environment="PATH=/home/ubuntu/stock-market-predictor/venv/bin"
-      ExecStart=/home/ubuntu/stock-market-predictor/venv/bin/gunicorn -w 4 --worker-class gthread --threads 10 -b 127.0.0.1:5001 --timeout 120 app:app
+      WorkingDirectory=/home/ubuntu/marketlens/backend
+      Environment="PATH=/home/ubuntu/marketlens/venv/bin"
+      ExecStart=/home/ubuntu/marketlens/venv/bin/gunicorn -w 4 --worker-class gthread --threads 10 -b 127.0.0.1:5001 --timeout 120 app:app
 
       [Install]
       WantedBy=multi-user.target
