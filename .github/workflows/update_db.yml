@@ -23,7 +23,7 @@ jobs:
           envs: DB_USER,DB_PASSWORD,DB_DSN,DB_WALLET_BASE64
           script: |
             set -e
-            cd /home/ubuntu/stock-market-predictor
+            cd /home/ubuntu/marketlens
             git pull origin main
 
             echo "$DB_WALLET_BASE64" | base64 -d > /home/ubuntu/wallet.zip

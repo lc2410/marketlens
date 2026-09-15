@@ -8,7 +8,7 @@ Stock trading is a complex process for both short and long-term investors, parti
 ## Application Architecture
 To ensure enterprise-grade stability, security, and performance, this application relies on a multi-layered architecture running on a dedicated Linux virtual machine (Ubuntu 22.04 LTS).
 
-![Image of Application Architecture](imgs/stock-market-predictor-arch.png)
+![Image of Application Architecture](imgs/marketlens-arch.png)
 
 1. **Client (Front-End React SPA):** The user interface is a modern Single Page Application (SPA) built with React 18, Vite, and React Router v7. The UI features two core views — a **Market Screener Dashboard** (homepage) and a **Stock Predictor** page — both completely decoupled from the heavy ML processing. The predictor utilizes the native `EventSource` API to maintain an open Server-Sent Events (SSE) connection, streaming a live execution checklist and progress trackers while the models train in the background.
 2. **Web Server (Nginx Reverse Proxy):** Nginx acts as the secure front door to the application. It serves the compiled React static assets from `frontend/dist/` with Gzip compression and long-term immutable caching for Vite-hashed files. It intercepts incoming public HTTP traffic on port 80 and reverse-proxies validated API requests (`/search/`, `/predict/`, `/predict_stream/`, `/screener`) to the internal application layer, with SSE-specific buffering disabled for the streaming endpoint.
@@ -25,7 +25,7 @@ To ensure enterprise-grade stability, security, and performance, this applicatio
 The repository is organized into cleanly separated domains to maintain strict modularity between the infrastructure, machine learning, API, database, and client-facing layers.
 
 ```text
-stock-market-predictor/
+marketlens/
 ├── .github/workflows/
 │   └── deploy.yml                  # Automated CI/CD pipeline configuration
 ├── backend/
@@ -176,16 +176,16 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/lc2410/stock-market-predictor.git
-    cd stock-market-predictor
+    git clone https://github.com/lc2410/marketlens.git
+    cd marketlens
     ```
 
 2.  **Environment Setup (Python 3.12 + Node v22):**
     
     **Mac / Linux:**
     ```bash
-    python3 -m venv stock-market-predictor-env
-    source stock-market-predictor-env/bin/activate
+    python3 -m venv marketlens-env
+    source marketlens-env/bin/activate
     pip install -r backend/requirements.txt
     python backend/ml_models/scripts/download_pretrained_model.py
     cd frontend
@@ -195,8 +195,8 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
 
     **Windows (PowerShell):**
     ```powershell
-    python -m venv stock-market-predictor-env
-    .\stock-market-predictor-env\Scripts\Activate.ps1
+    python -m venv marketlens-env
+    .\marketlens-env\Scripts\Activate.ps1
     pip install -r backend\requirements.txt
     python backend\ml_models\scripts\download_pretrained_model.py
     cd frontend
