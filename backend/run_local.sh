@@ -5,7 +5,7 @@ if [ "$1" == "--sync" ]; then
     echo "🔄 Syncing latest Oracle Wallet and Secrets from production server..."
     
     # 1. Download and extract wallet
-    scp -i ~/.ssh/github_actions -o StrictHostKeyChecking=no ubuntu@150.136.94.245:/home/ubuntu/wallet.zip wallet.zip
+    scp -i ~/.ssh/github_actions -o StrictHostKeyChecking=no ubuntu@150.136.112.120:/home/ubuntu/wallet.zip wallet.zip
     unzip -o wallet.zip -d wallet
     rm wallet.zip
     
@@ -15,7 +15,7 @@ if [ "$1" == "--sync" ]; then
     
     # 2. Extract database credentials from production systemd service
     echo "Fetching environment variables..."
-    ssh -i ~/.ssh/github_actions -o StrictHostKeyChecking=no ubuntu@150.136.94.245 "cat /etc/systemd/system/marketlens.service" | grep 'Environment="DB_' | sed 's/Environment="//g' | sed 's/"//g' > .env.temp
+    ssh -i ~/.ssh/github_actions -o StrictHostKeyChecking=no ubuntu@150.136.112.120 "cat /etc/systemd/system/marketlens.service" | grep 'Environment="DB_' | sed 's/Environment="//g' | sed 's/"//g' > .env.temp
     
     # Wrap values in single quotes to prevent bash parsing errors and format .env
     > .env

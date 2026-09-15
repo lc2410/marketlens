@@ -346,7 +346,7 @@ The continuous integration and continuous delivery/deployment lifecycle is fully
 ## Live Production Environment
 The application provides a clean, responsive web interface featuring interactive Chart.js visualizations to display historical trends, future forecasts, candlestick charts, and market heatmaps.
 
-You can access the live production environment hosted on Oracle Cloud here: [http://150.136.94.245](http://150.136.94.245)
+You can access the live production environment hosted on Oracle Cloud here: [http://150.136.112.120](http://150.136.112.120)
 *(Note: This is currently accessible via direct IP until domain name resolution and SSL certification are configured).*
 
 ---
