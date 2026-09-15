@@ -6,7 +6,7 @@ if ($sync) {
     Write-Host "🔄 Syncing latest Oracle Wallet and Secrets from production server..." -ForegroundColor Cyan
     
     # 1. Download and extract wallet
-    scp -i "$env:USERPROFILE\.ssh\github_actions" -o StrictHostKeyChecking=no ubuntu@150.136.47.42:/home/ubuntu/wallet.zip wallet.zip
+    scp -i "$env:USERPROFILE\.ssh\github_actions" -o StrictHostKeyChecking=no ubuntu@150.136.94.245:/home/ubuntu/wallet.zip wallet.zip
     Expand-Archive -Force -Path wallet.zip -DestinationPath wallet
     Remove-Item wallet.zip
     
@@ -20,7 +20,7 @@ if ($sync) {
     
     # 2. Extract database credentials from production systemd service
     Write-Host "Fetching environment variables..." -ForegroundColor Cyan
-    $remoteConfig = ssh -i "$env:USERPROFILE\.ssh\github_actions" -o StrictHostKeyChecking=no ubuntu@150.136.47.42 "cat /etc/systemd/system/marketlens.service"
+    $remoteConfig = ssh -i "$env:USERPROFILE\.ssh\github_actions" -o StrictHostKeyChecking=no ubuntu@150.136.94.245 "cat /etc/systemd/system/marketlens.service"
     
     $envContent = @()
     foreach ($line in $remoteConfig) {
