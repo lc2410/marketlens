@@ -84,16 +84,16 @@ resource "oci_core_subnet" "public_subnet" {
   cidr_block     = "10.0.1.0/24"
 }
 
-# Compute Instance
-resource "oci_core_instance" "app_server" {
+# Production Compute Instance
+resource "oci_core_instance" "prod_server" {
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   compartment_id      = var.compartment_ocid
-  display_name        = "marketlens-server"
+  display_name        = "marketlens-prod-server"
   shape               = "VM.Standard.A1.Flex"
 
   shape_config {
-    ocpus         = 2
-    memory_in_gbs = 12
+    ocpus         = 1
+    memory_in_gbs = 6
   }
 
   source_details {
@@ -110,91 +110,132 @@ resource "oci_core_instance" "app_server" {
     ssh_authorized_keys = var.ssh_public_key
     user_data           = base64encode(<<-EOF
       #!/bin/bash
-      # Open OS Firewall
       iptables -I INPUT 1 -m state --state NEW -p tcp --dport 80 -j ACCEPT
       netfilter-persistent save
-
-      # Install Dependencies
       apt-get update
       apt-get install -y python3-pip python3-venv git
-
-      # Clone and Setup App
       cd /home/ubuntu
       git clone https://github.com/lc2410/marketlens.git
       cd marketlens
       python3 -m venv venv
-      source venv/bin/activate
-      pip install -r requirements.txt
-
-      # Create Systemd Service for Gunicorn
-      cat << 'SERVICE' > /etc/systemd/system/marketlens.service
-      [Unit]
-      Description=Gunicorn instance to serve MarketLens
-      After=network.target
-
-      [Service]
-      User=root
-      Group=www-data
-      WorkingDirectory=/home/ubuntu/marketlens/backend
-      Environment="PATH=/home/ubuntu/marketlens/venv/bin"
-      ExecStart=/home/ubuntu/marketlens/venv/bin/gunicorn -w 4 --worker-class gthread --threads 10 -b 127.0.0.1:5001 --timeout 120 app:app
-
-      [Install]
-      WantedBy=multi-user.target
-      SERVICE
-
-      systemctl start marketlens
-      systemctl enable marketlens
-
-
+      chown -R ubuntu:ubuntu /home/ubuntu/marketlens
     EOF
     )
   }
-
 }
 
-output "public_ip" {
-  value = oci_core_instance.app_server.public_ip
+# Staging Compute Instance
+resource "oci_core_instance" "staging_server" {
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  compartment_id      = var.compartment_ocid
+  display_name        = "marketlens-staging-server"
+  shape               = "VM.Standard.A1.Flex"
+
+  shape_config {
+    ocpus         = 1
+    memory_in_gbs = 6
+  }
+
+  source_details {
+    source_id   = data.oci_core_images.ubuntu_arm.images[0].id
+    source_type = "image"
+  }
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.public_subnet.id
+    assign_public_ip = true
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+    user_data           = base64encode(<<-EOF
+      #!/bin/bash
+      iptables -I INPUT 1 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+      netfilter-persistent save
+      apt-get update
+      apt-get install -y python3-pip python3-venv git
+      cd /home/ubuntu
+      git clone https://github.com/lc2410/marketlens.git
+      cd marketlens
+      python3 -m venv venv
+      chown -R ubuntu:ubuntu /home/ubuntu/marketlens
+    EOF
+    )
+  }
 }
-resource "oci_database_autonomous_database" "db" {
+
+output "prod_public_ip" {
+  value = oci_core_instance.prod_server.public_ip
+}
+
+output "staging_public_ip" {
+  value = oci_core_instance.staging_server.public_ip
+}
+
+# Production Database
+resource "oci_database_autonomous_database" "prod_db" {
   admin_password = var.db_password
   compartment_id = var.compartment_ocid
-  db_name = "marketlensdb"
-
+  db_name = "marketlensproductiondb"
   db_workload = "OLTP"
-  display_name = "MarketLens_DB"
-
+  display_name = "MarketLens_Prod_DB"
   is_free_tier = true
-
   is_mtls_connection_required = true
   whitelisted_ips = ["0.0.0.0/0"]
-
 
   lifecycle {
     ignore_changes = [cpu_core_count, data_storage_size_in_tbs]
   }
-
-
-
 }
 
-resource "oci_database_autonomous_database_wallet" "wallet" {
-  autonomous_database_id = oci_database_autonomous_database.db.id
+# Staging Database
+resource "oci_database_autonomous_database" "staging_db" {
+  admin_password = var.db_password
+  compartment_id = var.compartment_ocid
+  db_name = "marketlensstagingdb"
+  db_workload = "OLTP"
+  display_name = "MarketLens_Staging_DB"
+  is_free_tier = true
+  is_mtls_connection_required = true
+  whitelisted_ips = ["0.0.0.0/0"]
+
+  lifecycle {
+    ignore_changes = [cpu_core_count, data_storage_size_in_tbs]
+  }
+}
+
+# Production Wallet
+resource "oci_database_autonomous_database_wallet" "prod_wallet" {
+  autonomous_database_id = oci_database_autonomous_database.prod_db.id
   password               = var.db_password
   base64_encode_content  = true
 }
 
-output "db_connection_strings" {
-  value = oci_database_autonomous_database.db.connection_strings
+# Staging Wallet
+resource "oci_database_autonomous_database_wallet" "staging_wallet" {
+  autonomous_database_id = oci_database_autonomous_database.staging_db.id
+  password               = var.db_password
+  base64_encode_content  = true
 }
 
-output "exact_db_dsn" {
-  description = "Copy this EXACT string to your GitHub DB_DSN Secret"
-  value       = "${oci_database_autonomous_database.db.db_name}_high"
+output "prod_exact_db_dsn" {
+  description = "Copy this EXACT string to your GitHub PROD_DB_DSN Secret"
+  value       = "${oci_database_autonomous_database.prod_db.db_name}_high"
 }
 
-output "db_wallet_base64" {
-  description = "Base64 encoded wallet. Run `terraform output -raw db_wallet_base64 | pbcopy` and paste into GitHub Secret DB_WALLET_BASE64"
-  value       = oci_database_autonomous_database_wallet.wallet.content
+output "staging_exact_db_dsn" {
+  description = "Copy this EXACT string to your GitHub STAGING_DB_DSN Secret"
+  value       = "${oci_database_autonomous_database.staging_db.db_name}_high"
+}
+
+output "prod_db_wallet_base64" {
+  description = "Base64 encoded wallet. Run `terraform output -raw prod_db_wallet_base64 | pbcopy` and paste into GitHub Secret PROD_DB_WALLET_BASE64"
+  value       = oci_database_autonomous_database_wallet.prod_wallet.content
+  sensitive   = true
+}
+
+output "staging_db_wallet_base64" {
+  description = "Base64 encoded wallet. Run `terraform output -raw staging_db_wallet_base64 | pbcopy` and paste into GitHub Secret STAGING_DB_WALLET_BASE64"
+  value       = oci_database_autonomous_database_wallet.staging_wallet.content
   sensitive   = true
 }

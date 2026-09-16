@@ -3,7 +3,11 @@ import pandas as pd
 import os
 import logging
 import urllib.parse
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
+
+# Load environment variables from the .env file if it exists
+load_dotenv()
 from database.dml.benchmarks import SELECT_ALL_BENCHMARKS
 from database.dml.benchmark_tickers import SELECT_BENCHMARK_CONSTITUENTS
 from database.dml.benchmark_prices import SELECT_BENCHMARK_PRICES
@@ -18,23 +22,34 @@ def get_engine():
     global engine
     if engine is None:
         db_user = os.environ.get("DB_USER", "ADMIN")
-        db_password = os.environ.get("DB_PASSWORD", "")
-        db_dsn = os.environ.get("DB_DSN", "")
-        
-        if not db_dsn:
-            logger.error("DB_DSN environment variable is not set. Cannot connect to Oracle DB.")
-            raise ValueError("DB_DSN is not set.")
+        db_password = os.environ.get("DB_PASSWORD")
+        if not db_password:
+            raise ValueError("DB_PASSWORD environment variable is not set.")
             
+        db_dsn = os.environ.get("DB_DSN", "localhost:1521/FREEPDB1")
+        app_env = os.environ.get("APP_ENV", "development")
+        
         encoded_password = urllib.parse.quote_plus(db_password)
         encoded_dsn = urllib.parse.quote_plus(db_dsn)
-        connection_url = f"oracle+oracledb://{db_user}:{encoded_password}@/?dsn={encoded_dsn}"
-        engine = create_engine(
-            connection_url,
-            connect_args={
-                "wallet_location": os.environ.get("TNS_ADMIN", "/home/ubuntu/wallet"),
-                "wallet_password": db_password
-            }
-        )
+        
+        if app_env == "development":
+            # Local connection without wallet
+            connection_url = f"oracle+oracledb://{db_user}:{encoded_password}@/?dsn={encoded_dsn}"
+            engine = create_engine(connection_url)
+        else:
+            # Cloud connection (Staging/Production) with wallet
+            if not db_dsn:
+                logger.error("DB_DSN environment variable is not set. Cannot connect to Oracle DB.")
+                raise ValueError("DB_DSN is not set.")
+                
+            connection_url = f"oracle+oracledb://{db_user}:{encoded_password}@/?dsn={encoded_dsn}"
+            engine = create_engine(
+                connection_url,
+                connect_args={
+                    "wallet_location": os.environ.get("TNS_ADMIN", "/home/ubuntu/wallet"),
+                    "wallet_password": db_password
+                }
+            )
     return engine
 
 def get_db_connection():

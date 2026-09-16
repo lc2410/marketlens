@@ -1,0 +1,20 @@
+services:
+  oracledb:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: marketlens-oracle-local
+    environment:
+      - ORACLE_PASSWORD=${DB_PASSWORD}
+      - ORACLE_APP_USER=${DB_USER}
+      - ORACLE_APP_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "1521:1521"
+    volumes:
+      - oradata:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  oradata:

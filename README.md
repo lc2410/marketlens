@@ -27,10 +27,15 @@ The repository is organized into cleanly separated domains to maintain strict mo
 ```text
 marketlens/
 ├── .github/workflows/
-│   └── deploy.yml                  # Automated CI/CD pipeline configuration
+│   ├── deploy.yml                  # Automated CI/CD pipeline configuration
+│   └── update_db.yml               # Automated scheduled database refresh
 ├── backend/
+│   ├── .env.txt                    # Example environment variables template
 │   ├── app.py                      # Flask application bootloader (port 5001)
+│   ├── docker-compose.yml          # Local Oracle database container config
 │   ├── requirements.txt            # Python dependency manifest
+│   ├── setup_local_db.sh           # Automated local DB setup (Mac/Linux)
+│   ├── setup_local_db.bat          # Automated local DB setup (Windows)
 │   ├── controllers/                # Flask routing and API endpoints
 │   │   ├── prediction_controller.py    # /predict & /predict_stream (SSE)
 │   │   ├── screener_controller.py      # /screener dashboard data
@@ -38,7 +43,10 @@ marketlens/
 │   ├── database/
 │   │   ├── ddl/                    # SQL schema definitions (CREATE TABLE)
 │   │   ├── dml/                    # Parameterized SQL query modules
-│   │   ├── scripts/                # Database update script (update_db.py)
+│   │   ├── scripts/                # Database automation scripts
+│   │   │   ├── create_db_admin_user.py # Automatically generates ADMIN user
+│   │   │   ├── db_connection_test.py   # Verifies local DB connection health
+│   │   │   └── update_db.py            # Populates database with market data
 │   ├── ml_models/                  # Scikit-learn ML pipeline & NLP engine
 │   │   ├── price_forecasting.py    # Multi-horizon price prediction
 │   │   ├── dividend_forecasting.py # Dividend payout prediction
@@ -50,6 +58,8 @@ marketlens/
 │   │   ├── screener_service.py     # Screener aggregation & technical scans
 │   │   └── external_data_service.py    # Yahoo Finance & Wikipedia data fetching
 │   ├── tests/                      # Pytest unit and integration test suite
+│   │   ├── conftest.py             # Global pytest fixtures and mocked environments
+│   │   ├── test_app.py             # Flask application bootloader tests
 │   │   ├── controllers/            # Controller endpoint tests
 │   │   ├── database/               # Database script tests
 │   │   ├── ml_models/              # ML model tests
@@ -94,7 +104,8 @@ marketlens/
 │   ├── marketlens.nginx.conf       # Nginx reverse proxy site config
 │   └── terraform.tfvars.txt        # Template for OCI credentials
 ├── pytest.ini                      # Pytest configuration
-├── reset-env.sh                    # Virtual environment reset script
+├── reset-env.sh                    # Virtual env builder/reset script (Mac/Linux)
+├── reset-env.bat                   # Virtual env builder/reset script (Windows)
 └── sonar-project.properties        # SonarCloud static analysis configuration
 ```
 
@@ -173,7 +184,7 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
 ---
 
 ## Local Development Setup
-
+*(Assume all commands/steps start out while in the root folder)*
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/lc2410/marketlens.git
@@ -181,91 +192,91 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
     ```
 
 2.  **Environment Setup (Python 3.12 + Node v22):**
+    This will create an isolated Python virtual environment, install the backend API dependencies, and download the heavy FinBERT ML model weights.
     
     **Mac / Linux:**
     ```bash
-    python3 -m venv marketlens-env
-    source marketlens-env/bin/activate
-    pip install -r backend/requirements.txt
-    python backend/ml_models/scripts/download_pretrained_model.py
+    bash reset-env.sh
     cd frontend
     npm i
     cd ..
     ```
 
-    **Windows (PowerShell):**
+    **Windows:**
     ```powershell
-    python -m venv marketlens-env
-    .\marketlens-env\Scripts\Activate.ps1
-    pip install -r backend\requirements.txt
-    python backend\ml_models\scripts\download_pretrained_model.py
+    .\reset-env.bat
     cd frontend
     npm i
     cd ..
     ```
 
-3.  **Configure Oracle Database Connection:**
-    The backend connects directly to the production Oracle Autonomous Database securely via mTLS. You'll only need to do this once every 5 years.
+3.  **Configure Local Environment Variables:**
+    Copy the provided template to create your `.env` file. This tells the backend to connect to your local Docker database instead of the cloud.
+    ```bash
+    cp backend/.env.txt backend/.env
+    ```
+
+4.  **Automated Local Database Setup (Docker):**
+    *Prerequisite: You must have [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running on your machine.*
     
-    *For Mac / Linux:*
-    Run this to automatically SSH into the production server, download the secure Oracle Wallet, extract it, and configure your local environment:
+    There's fully automated scripts that will boot up a free the Oracle DB container, dynamically generate an `ADMIN` user to mirror production, test the connection, and instantly populate it with live market data!
+    
+    **Mac / Linux:**
+    ```bash
+    bash backend/setup_local_db.sh
+    ```
+
+    **Windows:**
+    ```powershell
+    .\backend\setup_local_db.bat
+    ```
+
+5.  **Run the Backend Server:**
+    Start the Python Flask API:
     ```bash
     cd backend
-    ./run_local.sh --sync
-    cd ..
+    python3 app.py
     ```
 
-    *For Windows (PowerShell):*
-    ```powershell
-    cd backend
-    .\run_local.ps1 -sync
-    cd ..
-    ```
-
-4.  **Run the Backend Server:**
-    After configuring the initial Oracle Database Connection, you'll only need to run these commands below to locally run the backend.
-
-    *Mac / Linux:*
-    ```bash
-    cd backend
-    ./run_local.sh
-    ```
-
-    *Windows (PowerShell):*
-    ```powershell
-    cd backend
-    .\run_local.ps1
-    ```
-
-5.  **Run the Frontend Application (separate terminal):**
+6.  **Run the Frontend Application (separate terminal):**
+    Start the React development server:
     ```bash
     cd frontend
     npm run dev
     ```
-    The app will be available at `http://localhost:5173` with Vite proxying API requests to the Flask backend on port 5001.
+    The app is now running at `http://localhost:5173`!
 
-## Maintenance: Oracle Wallet Rotation (Every 5 Years)
-Oracle Autonomous Database mTLS wallets expire every 5 years for security purposes. When your wallet expires (around September 2031), follow these steps to rotate it:
+### Helpful Local Commands
 
-1. **Download the New Wallet:**
-   - Log into Oracle Cloud Infrastructure (OCI).
-   - Navigate to your Autonomous Database -> **Database Connection**.
-   - Click **Download Wallet**, enter a password, and download the `.zip` file.
+* **Stopping the Database:** To save battery and RAM when you're done coding, gracefully stop the database container without losing your data:
+  ```bash
+  cd backend
+  docker compose stop
+  ```
+  *(The next time you code, just run `docker compose start` to instantly resume it).*
 
-2. **Update the Live Server (GitHub Actions):**
-   - On your Mac terminal, convert the zip to base64: `base64 -i path/to/Wallet.zip | pbcopy`
-   - Go to your GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions**.
-   - Edit the `DB_WALLET_BASE64` secret and paste the new base64 string.
-   - The next time `deploy.yml` or `update_db.yml` runs, it will automatically unpack the new wallet on the production server.
+* **Destroying the Database:** If you want to completely wipe your local database and start fresh, you can permanently delete the container and its volume:
+  ```bash
+  cd backend
+  docker compose down -v
+  ```
 
-3. **Update Your Local Environment (Automated):**
-   - Simply run `./run_local.sh --sync` in your `backend/` directory.
-   - This will automatically SSH into the production server, download the new wallet, unpack it, and configure the internal paths for your Mac.
+* **Refreshing Market Data:** If you want to pull the latest daily stock data into your local database without rebuilding the entire Docker environment, just run the scraper directly:
+  ```bash
+  python3 backend/database/scripts/update_db.py
+  ```
+
+* **Exiting the Python Environment:** When you are completely done working on the project, you can gracefully exit the isolated Python virtual environment by simply typing:
+  ```bash
+  deactivate
+  ```
+
 
 ## Cloud Infrastructure (Terraform / OCI)
-The production environment is hosted on an **Oracle Cloud Infrastructure (OCI)** ARM-based instance (`VM.Standard.A1.Flex` shape with 2 OCPUs and 12GB RAM) running Ubuntu 22.04 LTS.
+The environment is split into **Staging** and **Production** to ensure stability. Both environments are hosted on **Oracle Cloud Infrastructure (OCI)** ARM-based instances (`VM.Standard.A1.Flex` shape with 1 OCPU and 6GB RAM each) running Ubuntu 22.04 LTS.
 
-Rather than configuring the server manually through a web console, the entire cloud environment is strictly version-controlled and provisioned using **Terraform**. This guarantees that the network topology is reproducible, auditable, and easily deployable by anyone cloning this repository.
+Rather than configuring the servers manually through a web console, the entire cloud environment is strictly version-controlled and provisioned using **Terraform**. This guarantees that the network topology is reproducible, auditable, and easily deployable by anyone cloning this repository.
+*(Assume all commands/steps start out while in the root folder)*
 
 ### Step 1: Prerequisites & Authentication
 To deploy your own instance of this architecture, you must first configure Terraform to communicate securely with Oracle Cloud:
@@ -280,7 +291,7 @@ To deploy your own instance of this architecture, you must first configure Terra
     region           = "us-ashburn-1" # Or your local region
     compartment_ocid = "ocid1.tenancy.oc1..."
     ssh_public_key   = "ssh-rsa..."
-    db_password      = "YOUR_OWN_PASSWORD"
+    db_password      = "YOUR_OWN_PASSWORD" <- Change this to something else
     ```
 
 ### Step 2: Provisioning the Network and Compute Layer
@@ -291,23 +302,49 @@ The Terraform scripts in the `infra/` directory are designed to build a secure, 
 
 To provision the infrastructure, run the following commands from the `infra/` directory:
 ```bash
+cd infra
 terraform init    # Initializes the OCI provider
 terraform plan    # Reviews the exact infrastructure changes
 terraform apply   # Provisions the VCN, Subnets, and Virtual Machine
 ```
+Type `yes` when prompted, and Terraform will create the Virtual Cloud Network, Subnets, Compute Instances, and Security Lists within your Oracle Cloud account.
 
 ### Step 3: Automated Database Updates (GitHub Actions)
 A scheduled GitHub Actions workflow (`update_db.yml`) automatically refreshes the screener database. In production, it runs every weekday at 5:30 PM ET (after market close):
 
 The update script fetches the latest benchmark indices and constituent tickers from Yahoo Finance and Wikipedia, downloads 1-year OHLCV price histories for all constituents (in chunks of 20 with exponential backoff retries), refreshes market news headlines, and writes everything directly to the Oracle Autonomous Database. Because the database is fully decoupled from the application server, this data is instantly available in production without requiring a repository commit or a server redeployment.
 
+### Maintenance: Oracle Wallet Rotation (Every 5 Years)
+Oracle Autonomous Database mTLS wallets expire every 5 years for security purposes. When your wallet expires (around September 2031), follow these steps to rotate it:
+
+1. **Download the New Wallet:**
+   - Log into Oracle Cloud Infrastructure (OCI).
+   - Navigate to your Autonomous Database (Staging or Prod) -> **Database Connection**.
+   - Click **Download Wallet**, enter a password, and download the `.zip` file.
+
+2. **Update the Live Server (GitHub Actions):**
+   - On your Mac terminal, convert the zip to base64: `base64 -i path/to/Wallet.zip | pbcopy`
+   - Go to your GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions**.
+   - Edit the `PROD_DB_WALLET_BASE64` or `STAGING_DB_WALLET_BASE64` secret and paste the new base64 string.
+   - The next time `deploy.yml` runs, it will automatically unpack the new wallet on the appropriate server.
+
+### Teardown: Destroying the Cloud Environment
+If you ever want to completely delete the cloud servers and stop all associated Oracle Cloud billing or resource usage, Terraform can systematically tear down the entire environment.
+
+From your local `infra/` directory, simply run:
+```bash
+cd infa
+terraform destroy
+```
+Type `yes` when prompted, and Terraform will delete the Virtual Cloud Network, Subnets, Compute Instances, and Security Lists from your Oracle Cloud account.
+
 ---
 
 ## Testing & Code Quality
 To ensure maximum reliability and prevent regressions, the application enforces strict quality gates through automated testing and static code analysis.
-
+*(Assume all commands/steps start out while in the root folder)*
 ### 1. Backend Testing (Pytest)
-A comprehensive suite of unit and integration tests validate the machine learning pipeline, controllers, services, database scripts, and utility functions. Tests simulate complex edge cases including mocked Yahoo Finance outages, missing dividend histories, and sparse ticker data. Code coverage is strictly maintained at around **90%**.
+A comprehensive suite of unit and integration tests validate the machine learning pipeline, controllers, services, database scripts, and utility functions. Tests simulate complex edge cases including mocked Yahoo Finance outages, missing dividend histories, and sparse ticker data. Code coverage is strictly maintained at around **90%** or higher.
 
 **Local Execution:**
 ```bash
@@ -327,36 +364,66 @@ npm run test:frontend
 
 ### 3. Static Analysis & Security
 * **SonarQube Cloud:** Every pull request and push is automatically scanned. It acts as a strict security gate, catching vulnerabilities, code smells, log injection risks, and enforcing test coverage minimums.
+    * **Setting up the Token:** To allow GitHub Actions to run these scans, you must log into your account at [SonarCloud.io](https://sonarcloud.io). Click your profile avatar in the top-right -> **My Account** -> **Security**. Generate a new User Token, copy it, and save it in your GitHub repository secrets as `SONAR_TOKEN`. (The `GITHUB_TOKEN` is automatically provided by GitHub).
 * **Security & Linting:** Python code is checked for syntactical integrity using `Flake8`, and JavaScript/React code is linted with `ESLint` (including `eslint-plugin-react` and `eslint-plugin-react-hooks`). Dependency trees are scanned for known CVEs and vulnerabilities using `safety` (Python) and `npm audit` (JavaScript).
 
 ---
 
 ## CI/CD Pipeline (GitHub Actions)
-The continuous integration and continuous delivery/deployment lifecycle is fully automated through a rigorous, multi-stage GitHub Actions pipeline (`deploy.yml`). Pushing a commit to any branch triggers the quality gates, with deployment to production reserved for `main`. A concurrency group ensures only the latest run per branch executes.
+The continuous integration and continuous delivery/deployment lifecycle is fully automated through a rigorous, multi-stage GitHub Actions pipeline (`deploy.yml`). 
+
+The pipeline dynamically alters its behavior based on your branching strategy:
+*   **Feature Branches (e.g., `dev`):** Any push or Pull Request triggers the full suite of automated tests, security scans, and code quality checks (stages 1-5 below) to validate the code. It **does not deploy**.
+*   **Staging Branch (`staging`):** Any code merged or pushed directly to this branch runs all validation checks and automatically deploys to the **Staging Environment** for live testing.
+*   **Production Branch (`main`):** Any code merged or pushed directly to this branch runs all validation checks and automatically deploys to the **Production Environment**.
 
 1. **Security & Vulnerability Scan:** Audits Python (`safety`) and NPM (`npm audit --audit-level=high`) dependencies for known CVEs.
 2. **Code Linting:** Runs `Flake8` to ensure Python styling and syntax standards, and `ESLint` to enforce JavaScript/React best practices.
 3. **Backend Automated Testing:** Downloads the FinBERT NLP model weights, then runs the full Pytest backend suite and generates an XML coverage report.
 4. **Frontend Automated Testing:** Installs Playwright browsers, then runs the E2E browser tests against the React application with mocked API calls.
 5. **Static Code Analysis:** Uploads the XML test coverage reports to SonarCloud to verify the Quality Gate passes.
-6. **Zero-Downtime Deployment** *(main branch only)*: Only if all prior stages pass perfectly, the pipeline establishes a secure SSH connection to the OCI production instance, pulls the latest repository updates, installs dependencies, builds the React frontend, deploys the Nginx site configuration, recreates the Gunicorn `systemd` service, and runs a health check with **automatic rollback** (`git reset --hard HEAD~1`) if the deployment fails.
+6. **Zero-Downtime Deployment**: Only if all prior stages pass perfectly, the pipeline establishes a secure SSH connection to the appropriate OCI instance, pulls the latest repository updates, installs dependencies, builds the React frontend, deploys the Nginx site configuration, recreates the Gunicorn `systemd` service, and runs a health check with **automatic rollback** (`git reset --hard HEAD~1`) if the deployment fails.
+
+### Required GitHub Secrets
+To make this work, you must add the following Repository Secrets to your GitHub settings:
+
+**Where to get these secrets:** Almost all of these are automatically generated for you when you run `terraform apply`.
+
+**Production Secrets:**
+* `PROD_HOST`: The public IP address of the production server (run `terraform output -raw prod_public_ip`).
+* `PROD_SSH_PRIVATE_KEY`: Your local SSH private key matching the public key in your `terraform.tfvars` (e.g. `cat ~/.ssh/id_rsa | pbcopy`).
+* `PROD_DB_USER`: The Oracle database admin username. This is always exactly `ADMIN`.
+* `PROD_DB_PASSWORD`: The exact password you provided for `db_password` in your `terraform.tfvars`.
+* `PROD_DB_DSN`: The database connection string (run `terraform output -raw prod_exact_db_dsn`).
+* `PROD_DB_WALLET_BASE64`: The cryptographic wallet (run `terraform output -raw prod_db_wallet_base64 | pbcopy`).
+
+**Staging Secrets:**
+* `STAGING_HOST`: The public IP address of the staging server (run `terraform output -raw staging_public_ip`).
+* `STAGING_SSH_PRIVATE_KEY`: Exact same as `PROD_SSH_PRIVATE_KEY`.
+* `STAGING_DB_USER`: Exact same as `PROD_DB_USER` (`ADMIN`).
+* `STAGING_DB_PASSWORD`: Exact same as `PROD_DB_PASSWORD` (from your `terraform.tfvars`).
+* `STAGING_DB_DSN`: The database connection string (run `terraform output -raw staging_exact_db_dsn`).
+* `STAGING_DB_WALLET_BASE64`: The cryptographic wallet (run `terraform output -raw staging_db_wallet_base64 | pbcopy`).
 
 ---
 
-## Live Production Environment
+## Live Cloud Environments
 The application provides a clean, responsive web interface featuring interactive Chart.js visualizations to display historical trends, future forecasts, candlestick charts, and market heatmaps.
 
-You can access the live production environment hosted on Oracle Cloud here: [http://150.136.112.120](http://150.136.112.120)
-*(Note: This is currently accessible via direct IP until domain name resolution and SSL certification are configured).*
+You can access the live environments hosted on Oracle Cloud here:
+* **Production:** [http://150.136.117.196](http://150.136.117.196)
+* **Staging:** [http://132.145.135.4](http://132.145.135.4)
+
+*(Note: These are currently accessible via direct IP until domain name resolution and SSL certification are configured).*
 
 ---
 
 ## Core Technologies
-* **Cloud & Infrastructure:** Oracle Cloud (OCI), Terraform, Linux (Ubuntu 22.04 LTS)
+* **Cloud & Infrastructure:** Oracle Cloud (OCI), Terraform, Linux (Ubuntu 22.04 LTS), Docker (Local Dev)
 * **CI/CD & DevOps:** GitHub Actions, SonarCloud (Static Analysis)
 * **Web Serving:** Nginx (Reverse Proxy), Gunicorn (WSGI)
 * **Back-End:** Python 3.12, Flask, Flask-CORS, Server-Sent Events (SSE)
-* **Database:** Oracle Autonomous Database
+* **Database:** Oracle Autonomous Database (Production & Staging), Oracle Database Free Image (Local Dev)
 * **Machine Learning:** Scikit-Learn (`HistGradientBoosting`), Pandas, NumPy, HuggingFace Transformers (FinBERT), PyTorch
 * **Data Sourcing:** yfinance (Yahoo Finance API), BeautifulSoup / lxml (Wikipedia Scraping), Requests
 * **Front-End:** React 18, React Router v7, Vite, JavaScript, CSS, Lucide React (Icons)

@@ -12,6 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from backend.services.external_data_service import fetch_benchmarks, fetch_headlines
 from backend.database.dml.benchmarks import DELETE_ALL_BENCHMARKS, INSERT_BENCHMARK
@@ -160,6 +161,7 @@ def _write_benchmarks(benchmarks, cursor):
     cursor.execute(DELETE_ALL_TICKERS)
     cursor.execute(DELETE_ALL_BENCHMARK_PRICES)
     cursor.execute(DELETE_ALL_BENCHMARKS)
+    cursor.connection.commit()
     
     inserted_tickers = set()
     
@@ -179,6 +181,7 @@ def _write_headlines(cursor):
     logger.info("Fetching headlines...")
     news = fetch_headlines()
     cursor.execute(DELETE_ALL_HEADLINES)
+    cursor.connection.commit()
     for headline in news:
         cursor.execute(INSERT_HEADLINE, [
             headline.get("title"),
