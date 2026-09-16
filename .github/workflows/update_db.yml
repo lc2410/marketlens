@@ -6,37 +6,74 @@ on:
   workflow_dispatch:
 
 jobs:
-  update-database:
+  update-production:
+    name: Update Production DB
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Remote Update via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DSN: ${{ secrets.DB_DSN }}
-          DB_WALLET_BASE64: ${{ secrets.DB_WALLET_BASE64 }}
+          DB_USER: ${{ secrets.PROD_DB_USER }}
+          DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          DB_DSN: ${{ secrets.PROD_DB_DSN }}
+          DB_WALLET_BASE64: ${{ secrets.PROD_DB_WALLET_BASE64 }}
+          APP_ENV: production
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DB_USER,DB_PASSWORD,DB_DSN,DB_WALLET_BASE64
+          host: ${{ secrets.PROD_HOST }}
+          username: ubuntu
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          envs: DB_USER,DB_PASSWORD,DB_DSN,DB_WALLET_BASE64,APP_ENV
           script: |
             set -e
             cd /home/ubuntu/marketlens
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "$DB_WALLET_BASE64" | base64 -d > /home/ubuntu/wallet.zip
             mkdir -p /home/ubuntu/wallet
             python3 -m zipfile -e /home/ubuntu/wallet.zip /home/ubuntu/wallet
             sed -i "s|?/network/admin|/home/ubuntu/wallet|g" /home/ubuntu/wallet/sqlnet.ora
 
+            source venv/bin/activate
+            export TNS_ADMIN=/home/ubuntu/wallet
+            export APP_ENV=$APP_ENV
 
+            echo "Starting daily database update on Production server..."
+            PYTHONPATH=backend python backend/database/scripts/update_db.py
+            echo "Production Database update completed successfully."
 
+  update-staging:
+    name: Update Staging DB
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Remote Update via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_USER: ${{ secrets.STAGING_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          DB_DSN: ${{ secrets.STAGING_DB_DSN }}
+          DB_WALLET_BASE64: ${{ secrets.STAGING_DB_WALLET_BASE64 }}
+          APP_ENV: staging
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ubuntu
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          envs: DB_USER,DB_PASSWORD,DB_DSN,DB_WALLET_BASE64,APP_ENV
+          script: |
+            set -e
+            cd /home/ubuntu/marketlens
+            git fetch origin staging
+            git reset --hard origin/staging
+
+            echo "$DB_WALLET_BASE64" | base64 -d > /home/ubuntu/wallet.zip
+            mkdir -p /home/ubuntu/wallet
+            python3 -m zipfile -e /home/ubuntu/wallet.zip /home/ubuntu/wallet
+            sed -i "s|?/network/admin|/home/ubuntu/wallet|g" /home/ubuntu/wallet/sqlnet.ora
 
             source venv/bin/activate
             export TNS_ADMIN=/home/ubuntu/wallet
+            export APP_ENV=$APP_ENV
 
-            echo "Starting daily database update on remote server..."
+            echo "Starting daily database update on Staging server..."
             PYTHONPATH=backend python backend/database/scripts/update_db.py
-            echo "Database update completed successfully."
+            echo "Staging Database update completed successfully."
