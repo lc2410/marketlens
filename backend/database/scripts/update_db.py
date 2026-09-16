@@ -161,6 +161,7 @@ def _write_benchmarks(benchmarks, cursor):
     cursor.execute(DELETE_ALL_TICKERS)
     cursor.execute(DELETE_ALL_BENCHMARK_PRICES)
     cursor.execute(DELETE_ALL_BENCHMARKS)
+    cursor.connection.commit()
     
     inserted_tickers = set()
     
@@ -180,6 +181,7 @@ def _write_headlines(cursor):
     logger.info("Fetching headlines...")
     news = fetch_headlines()
     cursor.execute(DELETE_ALL_HEADLINES)
+    cursor.connection.commit()
     for headline in news:
         cursor.execute(INSERT_HEADLINE, [
             headline.get("title"),
