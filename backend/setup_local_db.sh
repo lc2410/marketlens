@@ -2,37 +2,39 @@
 
 cd "$(dirname "$0")"
 
-echo "========================================="
+DIVIDER="========================================="
+
+echo "$DIVIDER"
 echo "1. Starting Local Oracle Database"
-echo "========================================="
+echo "$DIVIDER"
 docker compose down -v
 docker compose up -d
 
 echo ""
-echo "========================================="
+echo "$DIVIDER"
 echo "2. Waiting for Oracle to boot (~60-90s)"
-echo "========================================="
+echo "$DIVIDER"
 while ! docker logs marketlens-oracle-local 2>&1 | grep -q "DATABASE IS READY TO USE!"; do
   sleep 5
 done
 echo "✅ Database is fully booted!"
 
 echo ""
-echo "========================================="
+echo "$DIVIDER"
 echo "3. Creating ADMIN User"
-echo "========================================="
+echo "$DIVIDER"
 python3 database/scripts/create_db_admin_user.py
 
 echo ""
-echo "========================================="
+echo "$DIVIDER"
 echo "4. Testing Connection"
-echo "========================================="
+echo "$DIVIDER"
 python3 database/scripts/db_connection_test.py
 
 echo ""
-echo "========================================="
+echo "$DIVIDER"
 echo "5. Populating Database with Market Data"
-echo "========================================="
+echo "$DIVIDER"
 python3 database/scripts/update_db.py
 
 echo ""

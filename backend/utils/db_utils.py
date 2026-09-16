@@ -22,7 +22,10 @@ def get_engine():
     global engine
     if engine is None:
         db_user = os.environ.get("DB_USER", "ADMIN")
-        db_password = os.environ.get("DB_PASSWORD", "marketlens_dev")
+        db_password = os.environ.get("DB_PASSWORD")
+        if not db_password:
+            raise ValueError("DB_PASSWORD environment variable is not set.")
+            
         db_dsn = os.environ.get("DB_DSN", "localhost:1521/FREEPDB1")
         app_env = os.environ.get("APP_ENV", "development")
         

@@ -17,7 +17,7 @@ def test_get_db_connection_success(mock_get_engine):
     mock_get_engine.assert_called_once()
     assert conn == mock_get_engine.return_value.raw_connection.return_value
 
-@patch.dict('os.environ', {'APP_ENV': 'production', 'DB_DSN': ''}, clear=True)
+@patch.dict('os.environ', {'APP_ENV': 'production', 'DB_DSN': '', 'DB_PASSWORD': 'test'}, clear=True)
 def test_get_db_connection_not_found():
     # Clear the cached engine module variable
     import utils.db_utils
