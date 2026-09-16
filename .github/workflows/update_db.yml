@@ -8,6 +8,7 @@ on:
 jobs:
   update-production:
     name: Update Production DB
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Remote Update via SSH
@@ -44,6 +45,7 @@ jobs:
 
   update-staging:
     name: Update Staging DB
+    if: github.ref == 'refs/heads/staging' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Remote Update via SSH
