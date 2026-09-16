@@ -27,7 +27,7 @@ echo ""
 echo "========================================="
 echo "4. Testing Connection"
 echo "========================================="
-python3 database/scripts/test_db_connection.py
+python3 database/scripts/db_connection_test.py
 
 echo ""
 echo "========================================="

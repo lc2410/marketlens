@@ -29,7 +29,7 @@ echo.
 echo =========================================
 echo 4. Testing Connection
 echo =========================================
-python database/scripts/test_db_connection.py
+python database/scripts/db_connection_test.py
 
 echo.
 echo =========================================

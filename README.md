@@ -45,7 +45,7 @@ marketlens/
 │   │   ├── dml/                    # Parameterized SQL query modules
 │   │   ├── scripts/                # Database automation scripts
 │   │   │   ├── create_db_admin_user.py # Automatically generates ADMIN user
-│   │   │   ├── test_db_connection.py   # Verifies local DB connection health
+│   │   │   ├── db_connection_test.py   # Verifies local DB connection health
 │   │   │   └── update_db.py            # Populates database with market data
 │   ├── ml_models/                  # Scikit-learn ML pipeline & NLP engine
 │   │   ├── price_forecasting.py    # Multi-horizon price prediction
@@ -58,6 +58,8 @@ marketlens/
 │   │   ├── screener_service.py     # Screener aggregation & technical scans
 │   │   └── external_data_service.py    # Yahoo Finance & Wikipedia data fetching
 │   ├── tests/                      # Pytest unit and integration test suite
+│   │   ├── conftest.py             # Global pytest fixtures and mocked environments
+│   │   ├── test_app.py             # Flask application bootloader tests
 │   │   ├── controllers/            # Controller endpoint tests
 │   │   ├── database/               # Database script tests
 │   │   ├── ml_models/              # ML model tests
@@ -182,7 +184,7 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
 ---
 
 ## Local Development Setup
-
+*(Assume all commands/steps start out while in the root folder)*
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/lc2410/marketlens.git
@@ -247,7 +249,6 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
 ### Helpful Local Commands
 
 * **Stopping the Database:** To save battery and RAM when you're done coding, gracefully stop the database container without losing your data:
-  *(While in root folder)*
   ```bash
   cd backend
   docker compose stop
@@ -255,20 +256,17 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
   *(The next time you code, just run `docker compose start` to instantly resume it).*
 
 * **Destroying the Database:** If you want to completely wipe your local database and start fresh, you can permanently delete the container and its volume:
-  *(While in root folder)*
   ```bash
   cd backend
   docker compose down -v
   ```
 
 * **Refreshing Market Data:** If you want to pull the latest daily stock data into your local database without rebuilding the entire Docker environment, just run the scraper directly:
-  *(While in root folder)*
   ```bash
   python3 backend/database/scripts/update_db.py
   ```
 
 * **Exiting the Python Environment:** When you are completely done working on the project, you can gracefully exit the isolated Python virtual environment by simply typing:
-  *(While in root folder)*
   ```bash
   deactivate
   ```
@@ -278,6 +276,7 @@ The backend utilizes the HuggingFace `transformers` library to load the highly s
 The environment is split into **Staging** and **Production** to ensure stability. Both environments are hosted on **Oracle Cloud Infrastructure (OCI)** ARM-based instances (`VM.Standard.A1.Flex` shape with 1 OCPU and 6GB RAM each) running Ubuntu 22.04 LTS.
 
 Rather than configuring the servers manually through a web console, the entire cloud environment is strictly version-controlled and provisioned using **Terraform**. This guarantees that the network topology is reproducible, auditable, and easily deployable by anyone cloning this repository.
+*(Assume all commands/steps start out while in the root folder)*
 
 ### Step 1: Prerequisites & Authentication
 To deploy your own instance of this architecture, you must first configure Terraform to communicate securely with Oracle Cloud:
@@ -303,6 +302,7 @@ The Terraform scripts in the `infra/` directory are designed to build a secure, 
 
 To provision the infrastructure, run the following commands from the `infra/` directory:
 ```bash
+cd infra
 terraform init    # Initializes the OCI provider
 terraform plan    # Reviews the exact infrastructure changes
 terraform apply   # Provisions the VCN, Subnets, and Virtual Machine
@@ -333,6 +333,7 @@ If you ever want to completely delete the cloud servers and stop all associated 
 
 From your local `infra/` directory, simply run:
 ```bash
+cd infa
 terraform destroy
 ```
 Type `yes` when prompted, and Terraform will delete the Virtual Cloud Network, Subnets, Compute Instances, and Security Lists from your Oracle Cloud account.
@@ -341,7 +342,7 @@ Type `yes` when prompted, and Terraform will delete the Virtual Cloud Network, S
 
 ## Testing & Code Quality
 To ensure maximum reliability and prevent regressions, the application enforces strict quality gates through automated testing and static code analysis.
-
+*(Assume all commands/steps start out while in the root folder)*
 ### 1. Backend Testing (Pytest)
 A comprehensive suite of unit and integration tests validate the machine learning pipeline, controllers, services, database scripts, and utility functions. Tests simulate complex edge cases including mocked Yahoo Finance outages, missing dividend histories, and sparse ticker data. Code coverage is strictly maintained at around **90%** or higher.
 
