@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "**" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "**" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
@@ -150,10 +150,10 @@ jobs:
           args: >
             -Dsonar.python.coverage.reportPaths=coverage.xml
 
-  deploy:
-    name: Deploy to Production
+  deploy-staging:
+    name: Deploy to Staging
     needs: [lint, test-backend, test-frontend, sonarcloud, security-scan]
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -161,16 +161,124 @@ jobs:
       - name: Execute Remote SSH Commands
         uses: appleboy/ssh-action@v1.0.3
         env:
-          DB_WALLET_BASE64: ${{ secrets.DB_WALLET_BASE64 }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DSN: ${{ secrets.DB_DSN }}
+          DB_WALLET_BASE64: ${{ secrets.STAGING_DB_WALLET_BASE64 }}
+          DB_USER: ${{ secrets.STAGING_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          DB_DSN: ${{ secrets.STAGING_DB_DSN }}
+          APP_ENV: staging
 
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DB_WALLET_BASE64,DB_USER,DB_PASSWORD,DB_DSN
+          host: ${{ secrets.STAGING_HOST }}
+          username: ubuntu
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          envs: DB_WALLET_BASE64,DB_USER,DB_PASSWORD,DB_DSN,APP_ENV
+          script: |
+            set -e
+            cd /home/ubuntu/marketlens
+            sudo chown -R $(whoami):$(whoami) /home/ubuntu/marketlens
+            git config --global --add safe.directory /home/ubuntu/marketlens
+            git fetch origin
+            
+            # Switch to the branch that triggered the action
+            git reset --hard origin/${GITHUB_REF#refs/heads/}
+
+            echo "$DB_WALLET_BASE64" | base64 -d > /home/ubuntu/wallet.zip
+            mkdir -p /home/ubuntu/wallet
+            python3 -m zipfile -e /home/ubuntu/wallet.zip /home/ubuntu/wallet
+            sed -i "s|?/network/admin|/home/ubuntu/wallet|g" /home/ubuntu/wallet/sqlnet.ora
+
+            # Install/update Python dependencies
+            source venv/bin/activate
+            pip install -r backend/requirements.txt
+            python backend/ml_models/scripts/download_pretrained_model.py
+
+            # Install Node.js if not present
+            if ! command -v node &> /dev/null; then
+              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
+
+            # Install Nginx if not present
+            if ! command -v nginx &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y nginx
+            fi
+
+            # Build the React frontend
+            cd frontend
+            npm ci --prefer-offline
+            npm run build
+            cd ..
+
+            # Ensure Nginx (www-data) has execute permissions
+            sudo chmod 711 /home/ubuntu
+            sudo chmod 755 /home/ubuntu/marketlens
+            sudo chmod 755 /home/ubuntu/marketlens/frontend
+            sudo chmod -R 755 /home/ubuntu/marketlens/frontend/dist
+
+            # Deploy Nginx config (idempotent)
+            sudo systemctl stop marketlens || true
+            sudo rm -f /etc/nginx/sites-enabled/marketlens || true
+            sudo rm -f /etc/nginx/sites-available/marketlens || true
+            sudo rm -f /etc/nginx/sites-enabled/default || true
+
+            sudo cp infra/marketlens.nginx.conf /etc/nginx/sites-available/marketlens
+            sudo ln -sf /etc/nginx/sites-available/marketlens /etc/nginx/sites-enabled/marketlens
+            sudo nginx -t && sudo systemctl reload nginx
+
+            # Recreate Systemd Service for Gunicorn to point to the new backend folder and port
+            cat << SERVICE | sudo tee /etc/systemd/system/marketlens.service
+            [Unit]
+            Description=Gunicorn instance to serve Stock MarketLens API
+            After=network.target
+
+            [Service]
+            User=ubuntu
+            Group=www-data
+            WorkingDirectory=/home/ubuntu/marketlens/backend
+            Environment="PATH=/home/ubuntu/marketlens/venv/bin"
+            Environment="TNS_ADMIN=/home/ubuntu/wallet"
+            Environment="APP_ENV=$APP_ENV"
+            Environment="DB_USER=$DB_USER"
+            Environment="DB_PASSWORD=$DB_PASSWORD"
+            Environment="DB_DSN=$DB_DSN"
+
+            ExecStart=/home/ubuntu/marketlens/venv/bin/gunicorn -w 4 --worker-class gthread --threads 10 -b 127.0.0.1:5001 --timeout 120 app:app
+
+            [Install]
+            WantedBy=multi-user.target
+            SERVICE
+
+            # Restart Flask/Gunicorn API server
+            sudo systemctl daemon-reload
+            sudo systemctl restart marketlens
+            sleep 10
+
+            # Health check — Nginx should serve the React app at /
+            curl --fail http://localhost/ || (git reset --hard HEAD~1 && sudo systemctl restart marketlens && exit 1)
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [lint, test-backend, test-frontend, sonarcloud, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Execute Remote SSH Commands
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_WALLET_BASE64: ${{ secrets.PROD_DB_WALLET_BASE64 }}
+          DB_USER: ${{ secrets.PROD_DB_USER }}
+          DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          DB_DSN: ${{ secrets.PROD_DB_DSN }}
+          APP_ENV: production
+
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ubuntu
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          envs: DB_WALLET_BASE64,DB_USER,DB_PASSWORD,DB_DSN,APP_ENV
           script: |
             set -e
             cd /home/ubuntu/marketlens
@@ -181,9 +289,6 @@ jobs:
             mkdir -p /home/ubuntu/wallet
             python3 -m zipfile -e /home/ubuntu/wallet.zip /home/ubuntu/wallet
             sed -i "s|?/network/admin|/home/ubuntu/wallet|g" /home/ubuntu/wallet/sqlnet.ora
-
-
-
 
             git reset --hard origin/main
 
@@ -202,7 +307,6 @@ jobs:
             if ! command -v nginx &> /dev/null; then
               sudo apt-get update
               sudo apt-get install -y nginx
-
             fi
 
             # Build the React frontend
@@ -211,21 +315,17 @@ jobs:
             npm run build
             cd ..
 
-            # Ensure Nginx (www-data) has execute permissions to traverse the home directory
-            # and read permissions to serve the static React assets.
+            # Ensure Nginx (www-data) has execute permissions
             sudo chmod 711 /home/ubuntu
             sudo chmod 755 /home/ubuntu/marketlens
             sudo chmod 755 /home/ubuntu/marketlens/frontend
             sudo chmod -R 755 /home/ubuntu/marketlens/frontend/dist
 
             # Deploy Nginx config (idempotent)
-            sudo systemctl stop forecaster || true
-            sudo systemctl disable forecaster || true
-            sudo rm -f /etc/systemd/system/forecaster.service || true
-            sudo rm -f /etc/nginx/sites-enabled/forecaster || true
-            sudo rm -f /etc/nginx/sites-available/forecaster || true
+            sudo systemctl stop marketlens || true
+            sudo rm -f /etc/nginx/sites-enabled/marketlens || true
+            sudo rm -f /etc/nginx/sites-available/marketlens || true
             sudo rm -f /etc/nginx/sites-enabled/default || true
-
 
             sudo cp infra/marketlens.nginx.conf /etc/nginx/sites-available/marketlens
             sudo ln -sf /etc/nginx/sites-available/marketlens /etc/nginx/sites-enabled/marketlens
@@ -243,6 +343,7 @@ jobs:
             WorkingDirectory=/home/ubuntu/marketlens/backend
             Environment="PATH=/home/ubuntu/marketlens/venv/bin"
             Environment="TNS_ADMIN=/home/ubuntu/wallet"
+            Environment="APP_ENV=$APP_ENV"
             Environment="DB_USER=$DB_USER"
             Environment="DB_PASSWORD=$DB_PASSWORD"
             Environment="DB_DSN=$DB_DSN"
