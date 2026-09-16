@@ -23,6 +23,7 @@ Thumbs.db
 # Environment Variables & Secrets
 .env
 .env.*
+!.env.txt
 *.pem
 *.key
 
@@ -45,7 +46,6 @@ infra/terraform.tfvars
 *.tfstate.backup
 
 # Project Specific Local Files
-reset-env.sh
 to-do.txt
 *.log
 

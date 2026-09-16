@@ -12,6 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from backend.services.external_data_service import fetch_benchmarks, fetch_headlines
 from backend.database.dml.benchmarks import DELETE_ALL_BENCHMARKS, INSERT_BENCHMARK
