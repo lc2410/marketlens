@@ -179,8 +179,8 @@ jobs:
             git config --global --add safe.directory /home/ubuntu/marketlens
             git fetch origin
             
-            # Switch to the branch that triggered the action
-            git reset --hard origin/${GITHUB_REF#refs/heads/}
+            # Switch to the staging branch
+            git reset --hard origin/staging
 
             echo "$DB_WALLET_BASE64" | base64 -d > /home/ubuntu/wallet.zip
             mkdir -p /home/ubuntu/wallet
