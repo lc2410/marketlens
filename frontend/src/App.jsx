@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -42,6 +42,22 @@ function AppContent() {
 
   const [modalArticle, setModalArticle] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const lastFetchedTickerRef = useRef(null);
+
+  useEffect(() => {
+    const match = location.pathname.match(/^\/predict\/([^/]+)$/);
+    if (match) {
+      const tickerFromUrl = decodeURIComponent(match[1]);
+      
+      if (lastFetchedTickerRef.current !== tickerFromUrl) {
+        lastFetchedTickerRef.current = tickerFromUrl;
+        setSearchQuery(tickerFromUrl);
+        fetchPrediction(tickerFromUrl);
+      }
+    } else {
+      lastFetchedTickerRef.current = null;
+    }
+  }, [location.pathname, fetchPrediction]);
 
   // Triggers data fetching and routing for a specific stock ticker
   const handleSearch = useCallback(
@@ -49,19 +65,20 @@ function AppContent() {
       if (!ticker) {
         clearPrediction();
         setSearchQuery("");
+        localStorage.removeItem("lastSearchedTicker");
         navigate("/");
         return;
       }
-      setSearchQuery(ticker);
+      localStorage.setItem("lastSearchedTicker", ticker);
       navigate(`/predict/${encodeURIComponent(ticker.toUpperCase())}`);
-      fetchPrediction(ticker);
     },
-    [fetchPrediction, clearPrediction, navigate],
+    [clearPrediction, navigate],
   );
 
   const handleCancel = useCallback(() => {
     cancelPrediction();
     setSearchQuery("");
+    localStorage.removeItem("lastSearchedTicker");
     navigate("/");
   }, [cancelPrediction, navigate]);
 
