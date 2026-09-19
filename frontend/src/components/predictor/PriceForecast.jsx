@@ -82,7 +82,8 @@ function buildViewState(data) {
   }
 
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
-  const defaultDays = isMobile ? 180 : 365;
+  const isTablet = typeof window !== "undefined" && window.innerWidth > 768 && window.innerWidth <= 1024;
+  const defaultDays = isMobile ? 30 : isTablet ? 90 : 365;
   const todayStr =
     data.Chart_History.dates.at(-1);
   const todayTime = new Date(
@@ -97,7 +98,7 @@ function buildViewState(data) {
     max: initialMax,
     absoluteMin: absMin,
     absoluteMax: absMax,
-    activeRange: isMobile ? "6M" : "1Y",
+    activeRange: isMobile ? "1M" : isTablet ? "3M" : "1Y",
   };
 }
 
@@ -111,19 +112,22 @@ function RecentPriceSubtitle({ data }) {
       const diff = latestPrice - prevPrice;
       const pct = (diff / prevPrice) * 100;
       const isPos = diff >= 0;
-      const sign = isPos ? "+" : "";
+      const sign = isPos ? "+" : "-";
       changeEl = (
         <span
           className={`benchmark-change ${isPos ? "positive" : "negative"}`}
         >
-          {sign}
-          {pct.toFixed(2)}%
+          <span className="change-value">{sign}${Math.abs(diff).toFixed(2)}</span>
+          <span className="change-pct">({isPos ? "+" : ""}{pct.toFixed(2)}%)</span>
         </span>
       );
     }
     return (
-      <div className="recent-price-container">
-        <span>Most Recent Closed Price: ${latestPrice.toFixed(2)}</span>
+      <div className="recent-price-container benchmark-price-row">
+        <span className="benchmark-price">
+          <span className="price-label">Most Recent Closed Price:</span>
+          <span className="price-value">${latestPrice.toFixed(2)}</span>
+        </span>
         {changeEl}
       </div>
     );
@@ -133,19 +137,24 @@ function RecentPriceSubtitle({ data }) {
 
 // Displays horizon forecast cards, interactive price chart, and data table for the predicted asset
 export default function PriceForecast({ data, theme }) {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" && window.innerWidth <= 768,
-  );
+  const getDeviceCategory = () => {
+    if (typeof window === "undefined") return "desktop";
+    if (window.innerWidth <= 768) return "mobile";
+    if (window.innerWidth <= 1024) return "tablet";
+    return "desktop";
+  };
+  const [deviceCategory, setDeviceCategory] = useState(getDeviceCategory());
+
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
-      if (mobile !== isMobile) {
-        setIsMobile(mobile);
-      }
+      setDeviceCategory((prev) => {
+        const current = getDeviceCategory();
+        return prev !== current ? current : prev;
+      });
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isMobile]);
+  }, []);
   const [viewState, setViewState] = useState(() => buildViewState(data));
 
   const handleViewChange = useCallback((newView) => {
@@ -154,7 +163,8 @@ export default function PriceForecast({ data, theme }) {
 
   const handleReset = useCallback(() => {
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
-    const defaultDays = isMobile ? 180 : 365;
+    const isTablet = typeof window !== "undefined" && window.innerWidth > 768 && window.innerWidth <= 1024;
+    const defaultDays = isMobile ? 30 : isTablet ? 90 : 365;
     const todayStr =
       data.Chart_History.dates.at(-1);
     const todayTime = new Date(
@@ -174,14 +184,14 @@ export default function PriceForecast({ data, theme }) {
         ...prev,
         min: initialMin,
         max: initialMax,
-        activeRange: isMobile ? "6M" : "1Y",
+        activeRange: isMobile ? "1M" : isTablet ? "3M" : "1Y",
       };
     });
   }, [data]);
 
   useEffect(() => {
     handleReset();
-  }, [isMobile, handleReset]);
+  }, [deviceCategory, handleReset]);
 
   const f = data.Price_Forecasts;
   const isCrypto = data.Chart_Future_Dates.length === 365;

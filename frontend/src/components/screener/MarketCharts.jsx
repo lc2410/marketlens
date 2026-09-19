@@ -21,7 +21,13 @@ export default function MarketCharts({
   setChartType,
   setGroupBySector,
 }) {
-  const [isMobileZoom, setIsMobileZoom] = useState(window.innerWidth <= 768);
+  const getDeviceCategory = () => {
+    if (typeof window === "undefined") return "desktop";
+    if (window.innerWidth <= 768) return "mobile";
+    if (window.innerWidth <= 1024) return "tablet";
+    return "desktop";
+  };
+  const [deviceCategory, setDeviceCategory] = useState(getDeviceCategory());
   const [viewStates, setViewStates] = useState({});
 
   /**
@@ -38,14 +44,16 @@ export default function MarketCharts({
       ).getTime();
       const isMobile =
         typeof window !== "undefined" && window.innerWidth <= 768;
-      const defaultDays = isMobile ? 180 : 365;
+      const isTablet =
+        typeof window !== "undefined" && window.innerWidth > 768 && window.innerWidth <= 1024;
+      const defaultDays = isMobile ? 30 : isTablet ? 90 : 365;
       const initialMin = Math.max(minTs, maxTs - defaultDays * 86400000);
       return {
         min: initialMin,
         max: maxTs,
         absoluteMin: minTs,
         absoluteMax: maxTs,
-        activeRange: isMobile ? "6M" : "1Y",
+        activeRange: isMobile ? "1M" : isTablet ? "3M" : "1Y",
       };
     }
     return null;
@@ -58,12 +66,9 @@ export default function MarketCharts({
 
   useEffect(() => {
     const handleResize = () => {
-      const mobileZoom = window.innerWidth <= 768;
-      setIsMobileZoom((prev) => {
-        if (prev !== mobileZoom) {
-          return mobileZoom;
-        }
-        return prev;
+      setDeviceCategory((prev) => {
+        const current = getDeviceCategory();
+        return prev !== current ? current : prev;
       });
     };
     window.addEventListener("resize", handleResize);
@@ -89,7 +94,9 @@ export default function MarketCharts({
       if (!current) return prev;
       const isMobile =
         typeof window !== "undefined" && window.innerWidth <= 768;
-      const defaultDays = isMobile ? 180 : 365;
+      const isTablet =
+        typeof window !== "undefined" && window.innerWidth > 768 && window.innerWidth <= 1024;
+      const defaultDays = isMobile ? 30 : isTablet ? 90 : 365;
       const initialMin = Math.max(
         current.absoluteMin,
         current.absoluteMax - defaultDays * 86400000,
@@ -100,7 +107,7 @@ export default function MarketCharts({
           ...current,
           min: initialMin,
           max: current.absoluteMax,
-          activeRange: isMobile ? "6M" : "1Y",
+          activeRange: isMobile ? "1M" : isTablet ? "3M" : "1Y",
         },
       };
     });
@@ -114,7 +121,7 @@ export default function MarketCharts({
     if (benchmarkData?.dates?.length > 0) {
       handleResetView();
     }
-  }, [isMobileZoom, handleResetView, benchmarkData?.dates?.length]);
+  }, [deviceCategory, handleResetView, benchmarkData?.dates?.length]);
 
   if (!benchmarkData) return null;
 
@@ -139,23 +146,19 @@ export default function MarketCharts({
         ).toLocaleDateString()
       : "latest";
 
-  const activeTooltipText =
-    chartType === "heatmap" ? "1-Day Return" : "1-Year Return";
+
+  const prevPrice = benchmarkData.price / (1 + (benchmarkData.change / 100));
+  const changeAmount = benchmarkData.price - prevPrice;
 
   const chartSubtitlePrice = (
     <div className="benchmark-price-row active-benchmark-price-row-centered">
       <span className="benchmark-price">
-        Most Recent Closed Price: ${Number.parseFloat(benchmarkData.price).toFixed(2)}
+        <span className="price-label">Most Recent Closed Price:</span>
+        <span className="price-value">${Number.parseFloat(benchmarkData.price).toFixed(2)}</span>
       </span>
       <span className={`benchmark-change ${isPos ? "positive" : "negative"}`}>
-        {isPos ? "+" : ""}
-        {Number.parseFloat(benchmarkData.change).toFixed(2)}%
-      </span>
-      <span
-        data-tooltip={activeTooltipText}
-        className="info-tooltip-container info-tooltip-container-flex"
-      >
-        <Info size={16} />
+        <span className="change-value">{isPos ? "+" : "-"}${Math.abs(changeAmount).toFixed(2)}</span>
+        <span className="change-pct">({isPos ? "+" : ""}{Number.parseFloat(benchmarkData.change).toFixed(2)}%)</span>
       </span>
     </div>
   );
