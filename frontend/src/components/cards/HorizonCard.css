@@ -12,9 +12,12 @@
     border-color 0.2s ease;
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transform: translateZ(0);
+  will-change: transform;
 }
 .premium-horizon-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0);
   border-color: rgba(var(--brand-rgb), 0.4);
   box-shadow: 0 8px 24px rgba(var(--brand-rgb), 0.15);
 }
