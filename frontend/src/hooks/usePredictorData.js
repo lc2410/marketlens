@@ -18,12 +18,14 @@ export default function usePredictorData() {
   const timerIntervalRef = useRef(null);
   const activeStepIdRef = useRef(null);
   const eventSourceRef = useRef(null);
+  const retryTimeoutRef = useRef(null);
 
   const clearLoading = useCallback(() => {
     setIsLoading(false);
     setIsLoaderVisible(false);
     setIsLoaderFadingOut(false);
     clearInterval(timerIntervalRef.current);
+    clearTimeout(retryTimeoutRef.current);
   }, []);
 
   const clearPrediction = useCallback(() => {
@@ -32,6 +34,7 @@ export default function usePredictorData() {
     setProgress(0);
     setSteps([]);
     setResolvedTicker(null);
+    clearTimeout(retryTimeoutRef.current);
   }, []);
 
   const cancelPrediction = useCallback(() => {
@@ -39,6 +42,7 @@ export default function usePredictorData() {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
+    clearTimeout(retryTimeoutRef.current);
     clearLoading();
     setError('');
   }, [clearLoading]);
@@ -82,84 +86,101 @@ export default function usePredictorData() {
     clearInterval(timerIntervalRef.current);
     activeStepIdRef.current = null;
 
-    try {
-      const safeTicker = encodeURIComponent(upperTicker);
-      // Initialize Server-Sent Events (SSE) connection for real-time prediction updates
-      const eventSource = new EventSource(`/api/predict_stream/${safeTicker}`);
-      eventSourceRef.current = eventSource;
+    const connectSSE = (retries = 3) => {
+      try {
+        let hasReceivedMessage = false;
+        const safeTicker = encodeURIComponent(upperTicker);
+        // Initialize Server-Sent Events (SSE) connection for real-time prediction updates
+        const eventSource = new EventSource(`/api/predict_stream/${safeTicker}`);
+        eventSourceRef.current = eventSource;
 
-      eventSource.onmessage = (e) => {
-        if (eventSource !== eventSourceRef.current) return;
-        const data = JSON.parse(e.data);
+        eventSource.onmessage = (e) => {
+          if (eventSource !== eventSourceRef.current) return;
+          hasReceivedMessage = true;
+          const data = JSON.parse(e.data);
 
-        if (data.status === 'error') {
-          eventSource.close();
-          eventSourceRef.current = null;
-          clearInterval(timerIntervalRef.current);
-          setError(data.error || 'An unknown error occurred.');
-          clearLoading();
-          return;
-        }
+          if (data.status === 'error') {
+            eventSource.close();
+            eventSourceRef.current = null;
+            clearInterval(timerIntervalRef.current);
+            setError(data.error || 'An unknown error occurred.');
+            clearLoading();
+            return;
+          }
 
-        if (data.progress !== undefined) {
-          setProgress(data.progress);
-        }
+          if (data.progress !== undefined) {
+            setProgress(data.progress);
+          }
 
-        if (data.resolvedTicker) {
-          setResolvedTicker(data.resolvedTicker);
-        }
+          if (data.resolvedTicker) {
+            setResolvedTicker(data.resolvedTicker);
+          }
 
-        if (data.status === 'processing' && data.step) {
-          completeActiveStep();
-          const stepId = `step-${Date.now()}`;
-          activeStepIdRef.current = stepId;
+          if (data.status === 'processing' && data.step) {
+            completeActiveStep();
+            const stepId = `step-${Date.now()}`;
+            activeStepIdRef.current = stepId;
 
-          setSteps((prev) => [
-            ...prev,
-            { id: stepId, label: data.step, status: 'active', timer: 0.0 },
-          ]);
+            setSteps((prev) => [
+              ...prev,
+              { id: stepId, label: data.step, status: 'active', timer: 0.0 },
+            ]);
 
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = setInterval(() => {
-            setSteps((prev) =>
-              prev.map((s) =>
-                s.id === stepId ? { ...s, timer: Number.parseFloat((s.timer + 0.1).toFixed(1)) } : s
-              )
-            );
-          }, 100);
-        }
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = setInterval(() => {
+              setSteps((prev) =>
+                prev.map((s) =>
+                  s.id === stepId ? { ...s, timer: Number.parseFloat((s.timer + 0.1).toFixed(1)) } : s
+                )
+              );
+            }, 100);
+          }
 
-        if (data.status === 'complete') {
-          eventSource.close();
-          eventSourceRef.current = null;
-          clearInterval(timerIntervalRef.current);
-          completeActiveStep();
+          if (data.status === 'complete') {
+            eventSource.close();
+            eventSourceRef.current = null;
+            clearInterval(timerIntervalRef.current);
+            completeActiveStep();
 
-          setTimeout(() => {
-            setIsLoaderFadingOut(true);
             setTimeout(() => {
-              clearLoading();
-              setResult(data.result);
-              setIsFadeIn(true);
-              setTimeout(() => setIsFadeIn(false), 500);
-            }, 350); 
-          }, 800); 
-        }
-      };
+              setIsLoaderFadingOut(true);
+              setTimeout(() => {
+                clearLoading();
+                setResult(data.result);
+                setIsFadeIn(true);
+                setTimeout(() => setIsFadeIn(false), 500);
+              }, 350); 
+            }, 800); 
+          }
+        };
 
-      eventSource.onerror = () => {
-        if (eventSource !== eventSourceRef.current) return;
-        eventSource.close();
-        eventSourceRef.current = null;
+        eventSource.onerror = () => {
+          if (eventSource !== eventSourceRef.current) return;
+          eventSource.close();
+          eventSourceRef.current = null;
+          clearInterval(timerIntervalRef.current);
+          
+          if (!hasReceivedMessage && retries > 0) {
+            console.warn(`SSE connection failed, retrying in 2s... (${retries} retries left)`);
+            retryTimeoutRef.current = setTimeout(() => connectSSE(retries - 1), 2000);
+          } else {
+            setError('Connection to server lost. Please try again.');
+            clearLoading();
+          }
+        };
+      } catch (err) {
         clearInterval(timerIntervalRef.current);
-        setError('Connection to server lost. Please try again.');
-        clearLoading();
-      };
-    } catch (err) {
-      clearInterval(timerIntervalRef.current);
-      setError(err.message);
-      clearLoading();
-    }
+        if (retries > 0) {
+          console.warn(`SSE setup failed, retrying in 2s... (${retries} retries left)`);
+          retryTimeoutRef.current = setTimeout(() => connectSSE(retries - 1), 2000);
+        } else {
+          setError(err.message);
+          clearLoading();
+        }
+      }
+    };
+
+    connectSSE();
   }, [clearLoading, completeActiveStep, clearPrediction]);
 
   return {
