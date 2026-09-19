@@ -84,3 +84,9 @@
 .predictor-table-content tr:hover {
   background: rgba(var(--brand-rgb), 0.05);
 }
+
+@media (max-width: 768px) {
+  .predictor-table-subtitle {
+    margin-top: 12px;
+  }
+}

@@ -15,26 +15,40 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+html, body {
+  overflow-x: clip;
+}
+
 body {
   font-family: "Inter", sans-serif;
-  background-color: var(--bg-mesh-1);
-  background-image:
-    radial-gradient(at 0% 0%, var(--bg-mesh-1) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, var(--bg-mesh-2) 0px, transparent 50%);
-  background-attachment: fixed;
   color: var(--text-main);
   min-height: 100vh;
   margin: 0;
   padding: 40px 20px;
-  transition:
-    background-color 0.4s ease,
-    color 0.4s ease;
+  transition: color 0.4s ease;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  background-color: var(--bg-mesh-1);
+  background-image:
+    radial-gradient(at 0% 0%, var(--bg-mesh-1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, var(--bg-mesh-2) 0px, transparent 50%);
+  transition: background-color 0.4s ease;
 }
 
 .container {
   background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  transform: translateZ(0);
+  will-change: transform;
   border: 1px solid var(--glass-border);
   padding: 40px;
   border-radius: 24px;
@@ -235,4 +249,62 @@ p {
 .read-more-inline:hover {
   text-decoration: underline;
   color: var(--brand-primary-hover);
+}
+
+/* Chart subtitle mobile wrapping */
+.benchmark-price .price-value,
+.benchmark-price .price-label,
+.benchmark-change .change-value,
+.benchmark-change .change-pct {
+  display: inline;
+}
+
+@media (max-width: 768px) {
+  .benchmark-price-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .benchmark-price {
+    display: contents;
+  }
+
+  .benchmark-price .price-label {
+    flex-basis: 100%;
+    text-align: center;
+    margin-bottom: 2px;
+  }
+
+  .benchmark-change {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Left align and neatly stack for table subtitles */
+  .recent-price-container.benchmark-price-row,
+  .recent-payout-container.benchmark-price-row {
+    justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px; /* Space out evenly from the price */
+  }
+  
+  .recent-price-container .benchmark-price,
+  .recent-payout-container .benchmark-price {
+    display: flex;
+    flex-direction: row; flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .recent-price-container .price-label,
+  .recent-payout-container .price-label {
+    text-align: left;
+    flex-basis: auto; /* Revert flex-basis */
+    margin-bottom: 0;
+  }
 }

@@ -35,7 +35,11 @@ def get_engine():
         if app_env == "development":
             # Local connection without wallet
             connection_url = f"oracle+oracledb://{db_user}:{encoded_password}@/?dsn={encoded_dsn}"
-            engine = create_engine(connection_url)
+            engine = create_engine(
+                connection_url,
+                pool_pre_ping=True,
+                pool_recycle=1800
+            )
         else:
             # Cloud connection (Staging/Production) with wallet
             if not db_dsn:
@@ -48,7 +52,9 @@ def get_engine():
                 connect_args={
                     "wallet_location": os.environ.get("TNS_ADMIN", "/home/ubuntu/wallet"),
                     "wallet_password": db_password
-                }
+                },
+                pool_pre_ping=True,
+                pool_recycle=1800
             )
     return engine
 

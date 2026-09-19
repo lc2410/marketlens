@@ -82,6 +82,7 @@ export default function HeatmapChart({
       name: c.name || c.symbol,
       sector: c.sector || "Unknown",
       change: parseFloat(c.change) || 0,
+      price: c.price !== undefined ? parseFloat(c.price) : undefined,
       marketCap: c.marketCap || 0,
       weight: parseFloat(c.weight) || 0,
       v: parseFloat(c.weight) + 0.2,
@@ -180,10 +181,20 @@ export default function HeatmapChart({
                 else mcapStr = mcap.toLocaleString();
               }
 
-              const prefix = dataObj.change > 0 ? "+" : "";
+              let returnStr = "";
+              if (dataObj.price !== undefined && dataObj.change !== undefined) {
+                const isPos = dataObj.change >= 0;
+                const prevPrice = dataObj.price / (1 + (dataObj.change / 100));
+                const changeAmt = dataObj.price - prevPrice;
+                returnStr = `${isPos ? "+" : "-"}$${Math.abs(changeAmt).toFixed(2)} (${isPos ? "+" : ""}${dataObj.change.toFixed(2)}%)`;
+              } else {
+                const prefix = dataObj.change > 0 ? "+" : "";
+                returnStr = `${prefix}${dataObj.change.toFixed(2)}%`;
+              }
+
               const lines = [
                 `${dataObj.name} - ${dataObj.symbol}`,
-                `Day Return: ${prefix}${dataObj.change.toFixed(2)}%`,
+                `Day Return: ${returnStr}`,
                 `Market Cap: ${mcapStr}`,
                 `Index Weight: ${dataObj.weight.toFixed(4)}%`,
               ];
