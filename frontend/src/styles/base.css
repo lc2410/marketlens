@@ -16,7 +16,7 @@ button:focus-visible {
 }
 
 html, body {
-  overflow-x: clip;
+  overflow-x: visible;
 }
 
 body {
@@ -56,10 +56,13 @@ body::before {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
+  min-height: 85vh;
   transition:
     background-color 0.4s ease,
     border-color 0.4s ease;
 }
+
+
 
 h1 {
   font-size: 32px;
@@ -107,11 +110,9 @@ p {
 @keyframes fadeIn {
   0% {
     opacity: 0;
-    transform: translateY(15px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
