@@ -88,7 +88,7 @@ export default function NewsModal({ article, onClose }) {
               );
             }
 
-            const cutoffRegex = /(?:\s*\[?\s*(?:\.{3,}|\u2026|…)\s*\]?\s*|\s*\[?\s*(?:Read\s+(?:full\s+)?article|Read\s+More)\s*\]?\s*)+$/i;
+            const cutoffRegex = /(?:[\s[\]]*(?:\.{3,}|\u2026|…|Read\s+(?:full\s+)?article|Read\s+More))+[\s[\]]*$/i;
             const hasCutoff = cutoffRegex.test(article.summary);
             const cleanSummary = article.summary.replace(cutoffRegex, "").trimEnd();
 

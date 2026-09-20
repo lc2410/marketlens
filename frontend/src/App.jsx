@@ -69,7 +69,8 @@ function AppContent() {
         navigate("/");
         return;
       }
-      localStorage.setItem("lastSearchedTicker", ticker);
+      const sanitizedTicker = String(ticker).replace(/[^a-zA-Z0-9.-]/g, '');
+      localStorage.setItem("lastSearchedTicker", sanitizedTicker);
       navigate(`/predict/${encodeURIComponent(ticker.toUpperCase())}`);
     },
     [clearPrediction, navigate],

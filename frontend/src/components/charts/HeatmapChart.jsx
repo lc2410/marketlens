@@ -81,11 +81,11 @@ export default function HeatmapChart({
       symbol: c.symbol,
       name: c.name || c.symbol,
       sector: c.sector || "Unknown",
-      change: parseFloat(c.change) || 0,
-      price: c.price !== undefined ? parseFloat(c.price) : undefined,
+      change: Number.parseFloat(c.change) || 0,
+      price: c.price !== undefined ? Number.parseFloat(c.price) : undefined,
       marketCap: c.marketCap || 0,
-      weight: parseFloat(c.weight) || 0,
-      v: parseFloat(c.weight) + 0.2,
+      weight: Number.parseFloat(c.weight) || 0,
+      v: Number.parseFloat(c.weight) + 0.2,
     };
     symbolMap[c.symbol] = item;
     return item;
