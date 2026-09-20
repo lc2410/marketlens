@@ -119,3 +119,35 @@ def test_get_historical_prices_df_exception(mock_get_engine):
     mock_get_engine.side_effect = Exception("DB Error")
     df = get_historical_prices_df()
     assert df.empty
+
+@patch('utils.db_utils.create_engine')
+@patch.dict('os.environ', {'APP_ENV': 'development', 'DB_PASSWORD': 'test', 'DB_USER': 'USER', 'DB_DSN': 'dsn'}, clear=True)
+def test_get_engine_development(mock_create_engine):
+    import utils.db_utils
+    utils.db_utils.engine = None
+    engine = utils.db_utils.get_engine()
+    
+    mock_create_engine.assert_called_once_with(
+        "oracle+oracledb://USER:test@/?dsn=dsn",
+        pool_pre_ping=True,
+        pool_recycle=1800
+    )
+    assert engine == mock_create_engine.return_value
+
+@patch('utils.db_utils.create_engine')
+@patch.dict('os.environ', {'APP_ENV': 'production', 'DB_PASSWORD': 'test', 'DB_USER': 'USER', 'DB_DSN': 'dsn', 'TNS_ADMIN': '/custom/wallet'}, clear=True)
+def test_get_engine_production(mock_create_engine):
+    import utils.db_utils
+    utils.db_utils.engine = None
+    engine = utils.db_utils.get_engine()
+    
+    mock_create_engine.assert_called_once_with(
+        "oracle+oracledb://USER:test@/?dsn=dsn",
+        connect_args={
+            "wallet_location": "/custom/wallet",
+            "wallet_password": "test"
+        },
+        pool_pre_ping=True,
+        pool_recycle=1800
+    )
+    assert engine == mock_create_engine.return_value

@@ -211,18 +211,19 @@ export default function DividendChart({ data, theme }) {
       const diff = latestDiv - prevDiv;
       const pct = prevDiv !== 0 ? (diff / prevDiv) * 100 : 0;
       const isPos = diff >= 0;
-      const sign = isPos ? "+" : "";
+      const sign = isPos ? "+" : "-";
       changeEl = (
         <span className={`benchmark-change ${isPos ? "positive" : "negative"}`}>
-          {sign}
-          {pct.toFixed(2)}%
+          <span className="change-value">{sign}${Math.abs(diff).toFixed(2)}</span>
+          <span className="change-pct">({isPos ? "+" : ""}{pct.toFixed(2)}%)</span>
         </span>
       );
     }
     chartSubtitlePrice = (
       <div className="benchmark-price-row dividend-price-row">
         <span className="benchmark-price">
-          Most Recent Dividend Payout: ${latestDiv.toFixed(2)}
+          <span className="price-label">Most Recent Dividend Payout:</span>
+          <span className="price-value">${latestDiv.toFixed(2)}</span>
         </span>
         {changeEl}
       </div>

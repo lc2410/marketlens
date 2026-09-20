@@ -26,13 +26,13 @@
   justify-content: center;
   align-items: center;
   gap: 8px;
-  margin-bottom: 48px;
+  margin-bottom: 12px;
 }
 
 .generic-chart-legend-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 .generic-chart-canvas-wrapper {

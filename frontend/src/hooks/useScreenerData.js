@@ -30,12 +30,13 @@ export default function useScreenerData() {
       });
     }, 100);
 
-    fetch(`/api/screener?t=${new Date().getTime()}`)
-      .then(res => {
+    const fetchData = async (retries = 3) => {
+      if (ignore) return;
+      try {
+        const res = await fetch(`/api/screener?t=${new Date().getTime()}`);
         if (!res.ok) throw new Error('Failed to fetch screener data');
-        return res.json();
-      })
-      .then(fetchedData => {
+        const fetchedData = await res.json();
+        
         if (ignore) return;
         clearInterval(timerRef.current);
         setSteps(prev => prev.map(s => s.id === 'step-1' ? { ...s, status: 'complete' } : s));
@@ -54,13 +55,20 @@ export default function useScreenerData() {
             }, 500);
           }, 400);
         }, 500);
-      })
-      .catch(err => {
+      } catch (err) {
         if (ignore) return;
-        clearInterval(timerRef.current);
-        setError(err.message);
-        setLoading(false);
-      });
+        if (retries > 0) {
+          console.warn(`Screener fetch failed, retrying in 2s... (${retries} retries left)`);
+          setTimeout(() => fetchData(retries - 1), 2000);
+        } else {
+          clearInterval(timerRef.current);
+          setError(err.message);
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
       
     return () => {
       ignore = true;

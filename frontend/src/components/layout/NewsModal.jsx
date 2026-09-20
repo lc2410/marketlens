@@ -20,8 +20,17 @@ export default function NewsModal({ article, onClose }) {
 
   if (!article) return null;
 
+  const externalUrl = article.link || article.url;
+
   const handleOverlayClick = (e) => {
     if (e.target === overlayRef.current) onClose();
+  };
+
+  const handleLinkClick = (e, url) => {
+    if (!url || url === "#") return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return ReactDOM.createPortal(
@@ -48,43 +57,65 @@ export default function NewsModal({ article, onClose }) {
           <strong id="modalPublisher">{article.publisher}</strong>
           <a
             id="modalExternalLink"
-            href={article.link}
+            href={externalUrl || "#"}
             target="_blank"
             rel="noopener noreferrer"
             title="Open external article"
             className="modal-export-link"
+            onClick={(e) => handleLinkClick(e, externalUrl)}
+            style={{ cursor: "pointer" }}
           >
             <ExternalLink className="export-icon" />
           </a>
         </div>
         <div className="modal-body">
-          {article.summary ? (
-            <p id="modalSummary">
-              {article.summary.replace(/\[?(?:\.\.\.|…)\]?\s*$/, "").trimEnd()}
-              {article.summary.match(/\[?(?:\.\.\.|…)\]?\s*$/) && (
-                <a
-                  href={article.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="read-more-inline"
-                >
-                  ... [Read full article]
-                </a>
-              )}
-            </p>
-          ) : (
-            <p id="modalSummary" className="modal-summary-empty">
-              A preview summary is not available for this article.{" "}
-              <a
-                href={article.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="read-more-inline"
-              >
-                Read the full article on {article.publisher}
-              </a>
-            </p>
-          )}
+          {(() => {
+            if (!article.summary) {
+              return (
+                <p id="modalSummary" className="modal-summary-empty">
+                  A preview summary is not available for this article.{" "}
+                  <a
+                    href={externalUrl || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="read-more-inline"
+                    onClick={(e) => handleLinkClick(e, externalUrl)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    Read the full article on {article.publisher}
+                  </a>
+                </p>
+              );
+            }
+
+            const singleCutoffRegex = /[\s[\]]*(?:\.{3,}|\u2026|…|Read\s+(?:full\s+)?article|Read\s+More)[\s[\]]*$/i;
+            let cleanSummary = article.summary;
+            let hasCutoff = false;
+            
+            while (singleCutoffRegex.test(cleanSummary)) {
+              hasCutoff = true;
+              cleanSummary = cleanSummary.replace(singleCutoffRegex, "");
+            }
+            cleanSummary = cleanSummary.trimEnd();
+
+            return (
+              <p id="modalSummary">
+                {cleanSummary}
+                {hasCutoff && (
+                  <a
+                    href={externalUrl || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="read-more-inline"
+                    onClick={(e) => handleLinkClick(e, externalUrl)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    ... [Read full article]
+                  </a>
+                )}
+              </p>
+            );
+          })()}
         </div>
       </div>
     </div>,
