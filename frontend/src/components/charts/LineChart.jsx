@@ -35,6 +35,26 @@ export default function LineChart({
     y: close,
   }));
 
+  // Calculate dynamic Y-axis bounds based on visible data
+  let visibleMin = Infinity;
+  let visibleMax = -Infinity;
+
+  if (viewState?.min && viewState?.max) {
+    lineData.forEach((d) => {
+      if (d.x >= viewState.min && d.x <= viewState.max) {
+        if (d.y < visibleMin) visibleMin = d.y;
+        if (d.y > visibleMax) visibleMax = d.y;
+      }
+    });
+  }
+
+  // Fallback to overall min/max if no data in view or viewState not set
+  if (visibleMin === Infinity) visibleMin = Math.min(...data.history);
+  if (visibleMax === -Infinity) visibleMax = Math.max(...data.history);
+
+  const yMin = Math.floor(visibleMin * 0.995);
+  const yMax = Math.ceil(visibleMax * 1.005);
+
   const config = {
     type: "line",
     data: {
@@ -78,11 +98,11 @@ export default function LineChart({
       scales: {
         x: {
           type: "time",
-          time: { unit: "month", tooltipFormat: "MMM d, yyyy" },
+          bounds: "data",
+          time: { tooltipFormat: "MMM d, yyyy" },
           grid: { color: gridColor },
           ticks: {
             color: textColor,
-            autoSkip: false,
             maxRotation: 45,
             minRotation: 45,
             font: { size: 11 },
@@ -103,8 +123,8 @@ export default function LineChart({
                 maximumFractionDigits: 2,
               }),
           },
-          min: Math.min(...data.history) * 0.995,
-          max: Math.max(...data.history) * 1.005,
+          min: yMin,
+          max: yMax,
         },
       },
       animation: { duration: 0 },

@@ -9,6 +9,9 @@
   border-radius: 16px;
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transform: translateZ(0);
+  will-change: transform;
   overflow: hidden;
   height: 100%;
   margin-top: 20px;
