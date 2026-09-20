@@ -40,6 +40,26 @@ export default function CandlestickChart({
     c: parseFloat(close),
   }));
 
+  // Calculate dynamic Y-axis bounds based on visible data
+  let visibleMin = Infinity;
+  let visibleMax = -Infinity;
+
+  if (viewState?.min && viewState?.max) {
+    candleData.forEach((c) => {
+      if (c.x >= viewState.min && c.x <= viewState.max) {
+        if (c.l < visibleMin) visibleMin = c.l;
+        if (c.h > visibleMax) visibleMax = c.h;
+      }
+    });
+  }
+
+  // Fallback to overall min/max if no data in view or viewState not set
+  if (visibleMin === Infinity) visibleMin = Math.min(...data.low);
+  if (visibleMax === -Infinity) visibleMax = Math.max(...data.high);
+
+  const yMin = Math.floor(visibleMin * 0.995);
+  const yMax = Math.ceil(visibleMax * 1.005);
+
   const config = {
     type: "candlestick",
     data: {
@@ -49,6 +69,7 @@ export default function CandlestickChart({
           color: { up: posColor, down: negColor, unchanged: "#999" },
           borderColor: { up: posColor, down: negColor, unchanged: "#999" },
           borderWidth: 1,
+          maxBarThickness: 16,
         },
       ],
     },
@@ -84,11 +105,11 @@ export default function CandlestickChart({
       scales: {
         x: {
           type: "time",
-          time: { unit: "month", tooltipFormat: "MMM d, yyyy" },
+          bounds: "data",
+          time: { tooltipFormat: "MMM d, yyyy" },
           grid: { color: gridColor },
           ticks: {
             color: textColor,
-            autoSkip: false,
             maxRotation: 45,
             minRotation: 45,
             font: { size: 11 },
@@ -109,8 +130,8 @@ export default function CandlestickChart({
                 maximumFractionDigits: 2,
               }),
           },
-          min: Math.min(...data.low) * 0.995,
-          max: Math.max(...data.high) * 1.005,
+          min: yMin,
+          max: yMax,
         },
       },
       animation: { duration: 0 },

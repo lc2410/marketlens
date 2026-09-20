@@ -58,17 +58,17 @@ export default function ScreenerTable({
     });
     columns.push(currentPriceCol);
     columns.push({
-      header: "Percentage Change",
+      header: "Change",
       key: "change",
       cellClassName: (row) =>
         `change-cell ${row.change >= 0 ? "positive" : "negative"} ${orderBy === "change" ? "sorted-column" : ""}`,
       headerClassName: orderBy === "change" ? "sorted-header" : "",
       render: (row) => {
         const isPositive = row.change >= 0;
+        const changeAmount = row.price - row.prev_price;
         return (
           <>
-            {isPositive ? "+" : "-"}
-            {Math.abs(row.change).toFixed(2)}%
+            {isPositive ? "+" : "-"}${Math.abs(changeAmount).toFixed(2)} ({isPositive ? "+" : ""}{Number.parseFloat(row.change).toFixed(2)}%)
           </>
         );
       },
@@ -135,8 +135,11 @@ export default function ScreenerTable({
       cellClassName: (row) =>
         `change-cell ${row.breakout_high_pct >= 0 ? "positive" : "negative"} ${orderBy === "breakout_high_pct" ? "sorted-column" : ""}`,
       headerClassName: orderBy === "breakout_high_pct" ? "sorted-header" : "",
-      render: (row) =>
-        `${row.breakout_high_pct >= 0 ? "+" : "-"}${Math.abs(row.breakout_high_pct).toFixed(2)}%`,
+      render: (row) => {
+        const isPositive = row.breakout_high_pct >= 0;
+        const changeAmount = row.price - row.prev_period_high;
+        return `${isPositive ? "+" : "-"}$${Math.abs(changeAmount).toFixed(2)} (${isPositive ? "+" : ""}${Number.parseFloat(row.breakout_high_pct).toFixed(2)}%)`;
+      },
     });
   }
 
@@ -163,8 +166,11 @@ export default function ScreenerTable({
       cellClassName: (row) =>
         `change-cell ${row.breakout_low_pct >= 0 ? "positive" : "negative"} ${orderBy === "breakout_low_pct" ? "sorted-column" : ""}`,
       headerClassName: orderBy === "breakout_low_pct" ? "sorted-header" : "",
-      render: (row) =>
-        `${row.breakout_low_pct >= 0 ? "+" : "-"}${Math.abs(row.breakout_low_pct).toFixed(2)}%`,
+      render: (row) => {
+        const isPositive = row.breakout_low_pct >= 0;
+        const changeAmount = row.price - row.prev_period_low;
+        return `${isPositive ? "+" : "-"}$${Math.abs(changeAmount).toFixed(2)} (${isPositive ? "+" : ""}${Number.parseFloat(row.breakout_low_pct).toFixed(2)}%)`;
+      },
     });
   }
 

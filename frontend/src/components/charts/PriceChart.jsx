@@ -50,63 +50,79 @@ export default function PriceChart({ data, theme, viewState, onChartReady }) {
     text: isDark ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.5)",
   };
 
-  const hist = data.Chart_History;
+  const anchorDate = data.Chart_History.dates.at(-1);
 
-  const historyMap = new Map();
-  hist.dates.forEach((d, i) => historyMap.set(d, hist.prices[i]));
-  const historyCoords = Array.from(historyMap, ([x, y]) => ({ x, y })).sort(
-    (a, b) =>
-      new Date(typeof a.x === "string" ? a.x.replaceAll("-", "/") : a.x) -
-      new Date(typeof b.x === "string" ? b.x.replaceAll("-", "/") : b.x),
+  const allDatesSet = new Set([
+    ...data.Chart_History.dates,
+    ...(data.Train_Fit_Dates || []),
+    ...(data.Chart_Future_Dates || []),
+  ]);
+  const allDates = Array.from(allDatesSet).sort(
+    (a, b) => new Date(a.replaceAll("-", "/")) - new Date(b.replaceAll("-", "/"))
   );
 
-  const anchorDate = historyCoords.at(-1).x;
-  // Combine historical and projected data into a unified timeline for continuous charting
-  const unifiedMap = new Map();
+  const histMap = new Map();
+  data.Chart_History.dates.forEach((d, i) => histMap.set(d, data.Chart_History.prices[i]));
 
+  const projMap = new Map();
   if (data.Train_Fit_Dates) {
-    data.Train_Fit_Dates.forEach((d, i) => {
-      if (d !== anchorDate) unifiedMap.set(d, data.Train_Fit_Prices[i]);
+    data.Train_Fit_Dates.forEach((d, i) => projMap.set(d, data.Train_Fit_Prices[i]));
+  }
+  if (data.Chart_Future_Dates) {
+    data.Chart_Future_Dates.forEach((d, i) => projMap.set(d, data.Chart_Future_Prices[i]));
+  }
+
+  const upperMap = new Map();
+  upperMap.set(anchorDate, data.Chart_History.prices.at(-1));
+  if (data.Chart_Future_Dates) {
+    data.Chart_Future_Dates.forEach((d, i) => upperMap.set(d, data.Chart_Future_Upper[i]));
+  }
+
+  const lowerMap = new Map();
+  lowerMap.set(anchorDate, data.Chart_History.prices.at(-1));
+  if (data.Chart_Future_Dates) {
+    data.Chart_Future_Dates.forEach((d, i) => lowerMap.set(d, data.Chart_Future_Lower[i]));
+  }
+
+  const historyCoords = allDates.map((d) => ({ x: d, y: histMap.has(d) ? histMap.get(d) : null }));
+  const unifiedCoords = allDates.map((d) => ({ x: d, y: projMap.has(d) ? projMap.get(d) : null }));
+  const upperCoords = allDates.map((d) => ({ x: d, y: upperMap.has(d) ? upperMap.get(d) : null }));
+  const lowerCoords = allDates.map((d) => ({ x: d, y: lowerMap.has(d) ? lowerMap.get(d) : null }));
+
+  // Calculate dynamic Y-axis bounds based on visible data across all datasets
+  const allCoords = [
+    ...historyCoords,
+    ...unifiedCoords,
+    ...upperCoords,
+    ...lowerCoords,
+  ];
+
+  let visibleMin = Infinity;
+  let visibleMax = -Infinity;
+
+  if (viewState?.min && viewState?.max) {
+    allCoords.forEach((c) => {
+      if (c.y !== null && c.y !== undefined) {
+        const ts =
+          typeof c.x === "string"
+            ? new Date(c.x.replaceAll("-", "/")).getTime()
+            : c.x;
+        if (ts >= viewState.min && ts <= viewState.max) {
+          if (c.y < visibleMin) visibleMin = c.y;
+          if (c.y > visibleMax) visibleMax = c.y;
+        }
+      }
     });
   }
 
-  const projectedToday = data.Train_Fit_Prices?.length
-    ? data.Train_Fit_Prices.at(-1)
-    : historyCoords.at(-1).y;
-  unifiedMap.set(anchorDate, projectedToday);
+  if (visibleMin === Infinity) {
+    const validY = allCoords.map((c) => c.y).filter((y) => y !== null && y !== undefined);
+    visibleMin = Math.min(...validY);
+    visibleMax = Math.max(...validY);
+  }
 
-  data.Chart_Future_Dates.forEach((d, i) =>
-    unifiedMap.set(d, data.Chart_Future_Prices[i]),
-  );
-  const unifiedCoords = Array.from(unifiedMap, ([x, y]) => ({ x, y })).sort(
-    (a, b) =>
-      new Date(typeof a.x === "string" ? a.x.replaceAll("-", "/") : a.x) -
-      new Date(typeof b.x === "string" ? b.x.replaceAll("-", "/") : b.x),
-  );
-
-  const upperCoords = [
-    { x: anchorDate, y: projectedToday },
-    ...data.Chart_Future_Dates.map((d, i) => ({
-      x: d,
-      y: data.Chart_Future_Upper[i],
-    })),
-  ].sort(
-    (a, b) =>
-      new Date(typeof a.x === "string" ? a.x.replaceAll("-", "/") : a.x) -
-      new Date(typeof b.x === "string" ? b.x.replaceAll("-", "/") : b.x),
-  );
-
-  const lowerCoords = [
-    { x: anchorDate, y: projectedToday },
-    ...data.Chart_Future_Dates.map((d, i) => ({
-      x: d,
-      y: data.Chart_Future_Lower[i],
-    })),
-  ].sort(
-    (a, b) =>
-      new Date(typeof a.x === "string" ? a.x.replaceAll("-", "/") : a.x) -
-      new Date(typeof b.x === "string" ? b.x.replaceAll("-", "/") : b.x),
-  );
+  const yMin = Math.floor(visibleMin * 0.995);
+  const yMax = Math.ceil(visibleMax * 1.005);
 
   const config = {
     type: "line",
@@ -119,6 +135,8 @@ export default function PriceChart({ data, theme, viewState, onChartReady }) {
           borderColor: colors.history,
           borderWidth: 1.5,
           pointRadius: 2,
+          pointHitRadius: 10,
+          pointHoverRadius: 5,
           order: 1,
         },
         {
@@ -128,6 +146,8 @@ export default function PriceChart({ data, theme, viewState, onChartReady }) {
           backgroundColor: `rgba(${colors.brandRGB}, 0.4)`,
           borderWidth: 2,
           pointRadius: 0,
+          pointHitRadius: 10,
+          pointHoverRadius: 5,
           tension: 0.2,
           order: 0,
         },
@@ -161,17 +181,17 @@ export default function PriceChart({ data, theme, viewState, onChartReady }) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      interaction: { intersect: false, mode: "x" },
+      interaction: { intersect: false, mode: "index" },
       scales: {
         x: {
           type: "time",
+          bounds: "data",
           min: viewState?.min,
           max: viewState?.max,
-          time: { unit: "month", tooltipFormat: "MMM d, yyyy" },
+          time: { tooltipFormat: "MMM d, yyyy" },
           grid: { color: colors.grid },
           ticks: {
             color: colors.text,
-            autoSkip: false,
             maxRotation: 45,
             minRotation: 45,
             font: { size: 11 },
@@ -184,6 +204,8 @@ export default function PriceChart({ data, theme, viewState, onChartReady }) {
             font: { size: 11 },
             callback: (v) => `$${v.toLocaleString()}`,
           },
+          min: yMin,
+          max: yMax,
         },
       },
       plugins: {
@@ -220,6 +242,10 @@ export default function PriceChart({ data, theme, viewState, onChartReady }) {
           },
           callbacks: {
             label: (ctx) => {
+              if (ctx.parsed.y === null || ctx.parsed.y === undefined) {
+                return null;
+              }
+
               if (ctx.dataset.label === "Upper Bound") {
                 const hoverDate = ctx.raw.x;
                 const ciIndex = data.Chart_Future_Dates.indexOf(hoverDate);
@@ -284,18 +310,19 @@ export default function PriceChart({ data, theme, viewState, onChartReady }) {
       const diff = latestPrice - prevPrice;
       const pct = (diff / prevPrice) * 100;
       const isPos = diff >= 0;
-      const sign = isPos ? "+" : "";
+      const sign = isPos ? "+" : "-";
       changeEl = (
         <span className={`benchmark-change ${isPos ? "positive" : "negative"}`}>
-          {sign}
-          {pct.toFixed(2)}%
+          <span className="change-value">{sign}${Math.abs(diff).toFixed(2)}</span>
+          <span className="change-pct">({isPos ? "+" : ""}{pct.toFixed(2)}%)</span>
         </span>
       );
     }
     chartSubtitlePrice = (
       <div className="benchmark-price-row price-chart-price-row">
         <span className="benchmark-price">
-          Most Recent Closed Price: ${latestPrice.toFixed(2)}
+          <span className="price-label">Most Recent Closed Price:</span>
+          <span className="price-value">${latestPrice.toFixed(2)}</span>
         </span>
         {changeEl}
       </div>
