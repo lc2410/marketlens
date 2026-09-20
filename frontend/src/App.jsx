@@ -65,12 +65,9 @@ function AppContent() {
       if (!ticker) {
         clearPrediction();
         setSearchQuery("");
-        localStorage.removeItem("lastSearchedTicker");
         navigate("/");
         return;
       }
-      const sanitizedTicker = String(ticker).replace(/[^a-zA-Z0-9.-]/g, '');
-      localStorage.setItem("lastSearchedTicker", sanitizedTicker);
       navigate(`/predict/${encodeURIComponent(ticker.toUpperCase())}`);
     },
     [clearPrediction, navigate],
@@ -79,7 +76,6 @@ function AppContent() {
   const handleCancel = useCallback(() => {
     cancelPrediction();
     setSearchQuery("");
-    localStorage.removeItem("lastSearchedTicker");
     navigate("/");
   }, [cancelPrediction, navigate]);
 

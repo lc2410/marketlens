@@ -88,9 +88,15 @@ export default function NewsModal({ article, onClose }) {
               );
             }
 
-            const cutoffRegex = /(?:[\s[\]]*(?:\.{3,}|\u2026|…|Read\s+(?:full\s+)?article|Read\s+More))+[\s[\]]*$/i;
-            const hasCutoff = cutoffRegex.test(article.summary);
-            const cleanSummary = article.summary.replace(cutoffRegex, "").trimEnd();
+            const singleCutoffRegex = /[\s[\]]*(?:\.{3,}|\u2026|…|Read\s+(?:full\s+)?article|Read\s+More)[\s[\]]*$/i;
+            let cleanSummary = article.summary;
+            let hasCutoff = false;
+            
+            while (singleCutoffRegex.test(cleanSummary)) {
+              hasCutoff = true;
+              cleanSummary = cleanSummary.replace(singleCutoffRegex, "");
+            }
+            cleanSummary = cleanSummary.trimEnd();
 
             return (
               <p id="modalSummary">
